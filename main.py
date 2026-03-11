@@ -453,10 +453,31 @@ else:
 
     elif m == "🎓 امتحانی تعلیمی رپورٹ":
         render_exam_report()
+# مثال کے طور پر آپ کا فنکشن کچھ ایسا ہوگا
+def student_report(request, id):
+    # طالب علم کا ڈیٹا حاصل کریں
+    student = Student.objects.get(id=id)
+    
+    # پارہ ٹریکنگ کا ریکارڈ (مثالی ڈیٹا)
+    para_records = [
+        {'number': 1, 'start': '01-01-2026', 'end': '15-01-2026', 'days': 15, 'status': 'مکمل'},
+        {'number': 2, 'start': '16-01-2026', 'end': '--', 'days': '--', 'status': 'زیرِ تعلیم'},
+    ]
+    
+    # سابقہ امتحانات (مثالی ڈیٹا)
+    exams = [
+        {'name': 'ششماہی', 'date': '10-12-2025', 'total': 100, 'obtained': 95, 'remarks': 'ممتاز'},
+    ]
 
+    return render(request, 'student_detail.html', {
+        'student': student,
+        'para_records': para_records,
+        'exams': exams
+    })
     # ================= LOGOUT =================
     st.sidebar.divider()
     if st.sidebar.button("🚪 لاگ آؤٹ کریں"):
         st.session_state.logged_in = False
         st.rerun()
+
 
