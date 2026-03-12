@@ -5,7 +5,7 @@ import sqlite3
 import base64
 
 # ================= 1. ڈیٹا بیس سیٹ اپ =================
-DB_NAME = 'jamia_millia_v1.db'
+DB_NAME = 'jamia_millia_v1test.db'
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 c = conn.cursor()
 
@@ -507,3 +507,4 @@ else:
     if st.sidebar.button("🚪 لاگ آؤٹ کریں"):
         st.session_state.logged_in = False
         st.rerun()
+
