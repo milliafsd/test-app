@@ -170,64 +170,96 @@ if m == "⚙️ انتظامی کنٹرول":
 # ==========================================
 elif m == "📝 تعلیمی اندراج":
     st.header("📝 یومیہ تعلیمی اندراج")
-    sel_date = st.date_input("تاریخ منتخب کریں", get_pkt_time().date())
+    st.markdown("<p style='color: #2e7d32; font-weight: bold;'>طالب علم کی حاضری اور سبق، سبقی، منزل کا اندراج کریں</p>", unsafe_allow_html=True)
+    
+    sel_date = st.date_input("آج کی تاریخ منتخب کریں", get_pkt_time().date())
+    
+    # ڈیٹا بیس سے طلباء کا صاف ڈیٹا نکالنا
     students = c.execute("SELECT name, father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()
 
-    if not students: st.warning("آپ کی کلاس میں کوئی طالب علم نہیں ہے۔ منتظم سے رابطہ کریں۔")
+    if not students: 
+        st.warning("⚠️ آپ کی کلاس میں فی الحال کوئی طالب علم موجود نہیں۔")
     else:
         for s, f in students:
-            with st.expander(f"👤 {s} ولد {f}"):
-                att = st.radio(f"حاضری", ["حاضر", "غیر حاضر", "رخصت"], key=f"att_{s}", horizontal=True)
+            # ناموں کو بالکل صاف (Clean) اور بریکٹس سے پاک کرنا
+            clean_s_name = str(s).strip()
+            clean_f_name = str(f).strip()
+            display_name = f"{clean_s_name} ولد {clean_f_name}"
+            
+            with st.expander(f"👤 طالب علم: {display_name}"):
+                # حاضری کا ریڈیو بٹن (منفرد Key کے ساتھ تاکہ ایرر نہ آئے)
+                att = st.radio(
+                    f"📌 {clean_s_name} کی حاضری", 
+                    ["حاضر", "غیر حاضر (ناغہ)", "رخصت"], 
+                    key=f"att_{clean_s_name}_{sel_date}", 
+                    horizontal=True
+                )
+                
                 if att == "حاضر":
-                    # سبق
-                    s_nagha = st.checkbox("سبق کا ناغہ", key=f"sn_{s}")
+                    st.markdown("---")
+                    
+                    # سبق کا سیکشن
+                    st.markdown("### 📖 نیا سبق")
+                    s_nagha = st.checkbox("آج سبق کا ناغہ ہے؟", key=f"sn_{clean_s_name}")
                     if not s_nagha:
                         c1, c2, c3 = st.columns([2, 1, 1])
-                        surah = c1.selectbox("سورت", surahs_urdu, key=f"surah_{s}")
-                        a_from = c2.text_input("آیت سے", key=f"af_{s}")
-                        a_to = c3.text_input("آیت تک", key=f"at_{s}")
+                        surah = c1.selectbox("سورت", surahs_urdu, key=f"surah_{clean_s_name}")
+                        a_from = c2.text_input("آیت (سے)", placeholder="مثلاً 1", key=f"af_{clean_s_name}")
+                        a_to = c3.text_input("آیت (تک)", placeholder="مثلاً 5", key=f"at_{clean_s_name}")
                         sabq_final = f"{surah}: {a_from}-{a_to}"
-                    else: sabq_final = "ناغہ"
+                    else: 
+                        sabq_final = "ناغہ"
 
-                    # سبقی (Dynamic Rows)
-                    sq_nagha = st.checkbox("سبقی کا ناغہ", key=f"sqn_{s}")
+                    # سبقی کا سیکشن
+                    st.markdown("### 🔄 سبقی")
+                    sq_nagha = st.checkbox("آج سبقی کا ناغہ ہے؟", key=f"sqn_{clean_s_name}")
                     sq_list, sq_err, sq_atk = [], 0, 0
                     if not sq_nagha:
-                        if f"sq_c_{s}" not in st.session_state: st.session_state[f"sq_c_{s}"] = 1
-                        for i in range(st.session_state[f"sq_c_{s}"]):
+                        if f"sq_c_{clean_s_name}" not in st.session_state: st.session_state[f"sq_c_{clean_s_name}"] = 1
+                        for i in range(st.session_state[f"sq_c_{clean_s_name}"]):
                             c1, c2, c3, c4 = st.columns([2, 2, 1, 1])
-                            p = c1.selectbox(f"پارہ", paras, key=f"sqp_{s}_{i}")
-                            v = c2.selectbox(f"مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"sqv_{s}_{i}")
-                            a = c3.number_input(f"اٹکن", 0, key=f"sqa_{s}_{i}")
-                            e = c4.number_input(f"غلطی", 0, key=f"sqe_{s}_{i}")
+                            p = c1.selectbox(f"پارہ (سبقی)", paras, key=f"sqp_{clean_s_name}_{i}")
+                            v = c2.selectbox(f"مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"sqv_{clean_s_name}_{i}")
+                            a = c3.number_input(f"اٹکن", 0, 20, key=f"sqa_{clean_s_name}_{i}")
+                            e = c4.number_input(f"غلطی", 0, 20, key=f"sqe_{clean_s_name}_{i}")
                             sq_list.append(f"{p}:{v}"); sq_atk += a; sq_err += e
-                        if st.button("➕ مزید سبقی", key=f"add_sq_{s}"): st.session_state[f"sq_c_{s}"] += 1; st.rerun()
-                    else: sq_list = ["ناغہ"]
+                        if st.button("➕ مزید سبقی شامل کریں", key=f"add_sq_{clean_s_name}"): 
+                            st.session_state[f"sq_c_{clean_s_name}"] += 1
+                            st.rerun()
+                    else: 
+                        sq_list = ["ناغہ"]
 
-                    # منزل (Dynamic Rows)
-                    m_nagha = st.checkbox("منزل کا ناغہ", key=f"mn_{s}")
+                    # منزل کا سیکشن
+                    st.markdown("### 🏠 منزل")
+                    m_nagha = st.checkbox("آج منزل کا ناغہ ہے؟", key=f"mn_{clean_s_name}")
                     m_list, m_err, m_atk = [], 0, 0
                     if not m_nagha:
-                        if f"m_c_{s}" not in st.session_state: st.session_state[f"m_c_{s}"] = 1
-                        for i in range(st.session_state[f"m_c_{s}"]):
+                        if f"m_c_{clean_s_name}" not in st.session_state: st.session_state[f"m_c_{clean_s_name}"] = 1
+                        for i in range(st.session_state[f"m_c_{clean_s_name}"]):
                             c1, c2, c3, c4 = st.columns([2, 2, 1, 1])
-                            p = c1.selectbox(f"پارہ", paras, key=f"mp_{s}_{i}")
-                            v = c2.selectbox(f"مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"mv_{s}_{i}")
-                            a = c3.number_input(f"اٹکن", 0, key=f"ma_{s}_{i}")
-                            e = c4.number_input(f"غلطی", 0, key=f"me_{s}_{i}")
+                            p = c1.selectbox(f"پارہ (منزل)", paras, key=f"mp_{clean_s_name}_{i}")
+                            v = c2.selectbox(f"مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"mv_{clean_s_name}_{i}")
+                            a = c3.number_input(f"اٹکن", 0, 20, key=f"ma_{clean_s_name}_{i}")
+                            e = c4.number_input(f"غلطی", 0, 20, key=f"me_{clean_s_name}_{i}")
                             m_list.append(f"{p}:{v}"); m_atk += a; m_err += e
-                        if st.button("➕ مزید منزل", key=f"add_m_{s}"): st.session_state[f"m_c_{s}"] += 1; st.rerun()
-                    else: m_list = ["ناغہ"]
+                        if st.button("➕ مزید منزل شامل کریں", key=f"add_m_{clean_s_name}"): 
+                            st.session_state[f"m_c_{clean_s_name}"] += 1
+                            st.rerun()
+                    else: 
+                        m_list = ["ناغہ"]
 
-                    if st.button("محفوظ کریں", key=f"save_{s}"):
+                    if st.button(f"💾 {clean_s_name} کا مکمل ریکارڈ محفوظ کریں", key=f"save_{clean_s_name}"):
                         c.execute("INSERT INTO hifz_records (r_date, s_name, f_name, t_name, surah, sq_p, sq_a, sq_m, m_p, m_a, m_m, attendance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                                  (str(sel_date), s, f, st.session_state.username, sabq_final, " | ".join(sq_list), sq_atk, sq_err, " | ".join(m_list), m_atk, m_err, att))
-                        conn.commit(); st.success("محفوظ ہو گیا!")
+                                  (str(sel_date), clean_s_name, clean_f_name, st.session_state.username, sabq_final, " | ".join(sq_list), sq_atk, sq_err, " | ".join(m_list), m_atk, m_err, att))
+                        conn.commit()
+                        st.success(f"✅ {clean_s_name} کا ریکارڈ بہترین انداز میں محفوظ ہو گیا!")
+                
                 else:
-                    if st.button("حاضری لگائیں", key=f"save_absent_{s}"):
+                    if st.button(f"💾 {clean_s_name} کی {att} محفوظ کریں", key=f"save_absent_{clean_s_name}"):
                         c.execute("INSERT INTO hifz_records (r_date, s_name, f_name, t_name, attendance, surah, sq_p, m_p) VALUES (?,?,?,?,?,?,?,?)", 
-                                  (str(sel_date), s, f, st.session_state.username, att, "-", "-", "-"))
-                        conn.commit(); st.success(f"{att} لگ گئی!")
+                                  (str(sel_date), clean_s_name, clean_f_name, st.session_state.username, att, "-", "-", "-"))
+                        conn.commit()
+                        st.success(f"✅ {clean_s_name} کی آج کی {att} درج ہو گئی!")
 
 # ==========================================
 # ماڈیول: یومیہ تعلیمی رپورٹ (ایڈمن)
@@ -346,29 +378,36 @@ elif m == "📜 ماہانہ رزلٹ کارڈ":
             st.markdown(generate_html_print(df_month, f"ماہانہ رزلٹ کارڈ ({m_year}-{m_month:02d})"), unsafe_allow_html=True)
 
 # ==========================================
-# ماڈیول: اساتذہ کا ریکارڈ (حاضری)
+# ماڈیول: اساتذہ کا ریکارڈ (میری حاضری)
 # ==========================================
 elif m == "🕒 میری حاضری":
     st.header("🕒 میری یومیہ حاضری")
-    m_date = st.date_input("تاریخ", date.today())
-    m_time = st.time_input("آمد کا وقت", get_pkt_time().time())
-    if st.button("حاضری درج کریں"):
-        sys_t = get_pkt_time().strftime("%Y-%m-%d %H:%M:%S")
-        chk = c.execute("SELECT 1 FROM t_attendance WHERE t_name=? AND manual_date=?", (st.session_state.username, str(m_date))).fetchone()
-        if chk: st.error("اس تاریخ کی حاضری لگ چکی ہے۔")
-        else:
-            c.execute("INSERT INTO t_attendance (t_name, manual_date, manual_time, system_timestamp) VALUES (?,?,?,?)", (st.session_state.username, str(m_date), str(m_time), sys_t))
-            conn.commit(); st.success("حاضری درج ہو گئی!")
-
-elif m == "🕒 اساتذہ کا ریکارڈ":
-    st.header("🕒 اساتذہ کی حاضری کا ریکارڈ")
-    df_att = pd.read_sql_query("SELECT id as 'ID', t_name as 'استاد', manual_date as 'تاریخ', manual_time as 'وقتِ آمد' FROM t_attendance ORDER BY manual_date DESC", conn)
-    st.dataframe(df_att, use_container_width=True)
-    if not df_att.empty: st.markdown(generate_html_print(df_att.drop(columns=['ID']), "اساتذہ کی حاضری رپورٹ"), unsafe_allow_html=True)
+    st.markdown("<p style='color: #008CBA; font-weight: bold;'>اپنی آج کی حاضری کا بروقت اندراج یقینی بنائیں۔</p>", unsafe_allow_html=True)
     
-    st.divider()
-    del_att = st.number_input("حذف کرنے کے لیے حاضری کی ID درج کریں", min_value=0, step=1, key="del_att")
-    if st.button("حاضری حذف کریں"): execute_delete("t_attendance", del_att)
+    with st.form("attendance_form", clear_on_submit=False):
+        c1, c2 = st.columns(2)
+        m_date = c1.date_input("حاضری کی تاریخ", date.today())
+        m_time = c2.time_input("آمد کا وقت", get_pkt_time().time())
+        
+        if st.form_submit_button("✅ حاضری درج کریں"):
+            sys_t = get_pkt_time().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # چیک کریں کہ کیا حاضری پہلے ہی لگ چکی ہے؟
+            chk = c.execute("SELECT 1 FROM t_attendance WHERE t_name=? AND manual_date=?", (st.session_state.username, str(m_date))).fetchone()
+            
+            if chk: 
+                st.error(f"🛑 آپ کی {m_date} کی حاضری پہلے ہی لگ چکی ہے۔ ایک دن میں دو بار حاضری نہیں لگائی جا سکتی۔")
+            else:
+                try:
+                    c.execute("""
+                        INSERT INTO t_attendance (t_name, manual_date, manual_time, system_timestamp) 
+                        VALUES (?, ?, ?, ?)
+                    """, (st.session_state.username, str(m_date), str(m_time), sys_t))
+                    conn.commit()
+                    st.success("✅ آپ کی حاضری کامیابی سے درج ہو گئی ہے!")
+                except sqlite3.OperationalError as e:
+                    st.error("❌ سسٹم ایرر: ڈیٹا بیس میں کالمز کی تبدیلی کا مسئلہ ہے۔")
+                    st.info("💡 مہربانی فرما کر ایپ کے فولڈر میں موجود 'jamia_millia_final.db' فائل کو حذف (Delete) کر دیں، تاکہ سسٹم نیا اور درست ٹیبل خود بخود بنا لے۔")
 
 # ==========================================
 # ماڈیول: مہتمم پینل (رخصت)
@@ -406,3 +445,4 @@ elif m == "🏛️ مہتمم پینل (رخصت)":
     if not df_lv.empty: st.markdown(generate_html_print(df_lv, "اساتذہ کی رخصت کا ریکارڈ"), unsafe_allow_html=True)
 
 conn.close()
+
