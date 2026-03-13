@@ -1,46 +1,33 @@
-import streamlit as st
-import pandas as pd
-from datetime import datetime, date, timedelta
-import sqlite3
-import base64
-
+init_db()
 # ==========================================
-# 1. ڈیٹا بیس سیٹ اپ اور آٹو اپ گریڈ
+# 1. ڈیٹا بیس سیٹ اپ اور کنکشن
 # ==========================================
-import re
+DB_NAME = 'jamia_millia_v1test.db'
+conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+c = conn.cursor()
 
-def clean_text(val):
-    """یہ فنکشن ڈیٹا بیس کی پرانی غلطیوں (بریکٹس اور کوماز) کو صاف کرے گا"""
-    if not val: return ""
-    # تمام بریکٹس، کوماز اور کوٹیشن مارکس کو اڑا دیں
-    cleaned = re.sub(r"[()\'\",]", "", str(val))
-    return cleaned.strip()
+def get_pkt_time():
+    return datetime.utcnow() + timedelta(hours=5)
 
 def init_db():
+    # اساتذہ
     c.execute('''CREATE TABLE IF NOT EXISTS teachers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, phone TEXT, address TEXT, id_card TEXT)''')
+    # طلباء
     c.execute('''CREATE TABLE IF NOT EXISTS students (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, father_name TEXT, teacher_name TEXT, phone TEXT, address TEXT)''')
+    # حفظ ریکارڈ
     c.execute('''CREATE TABLE IF NOT EXISTS hifz_records (id INTEGER PRIMARY KEY AUTOINCREMENT, r_date DATE, s_name TEXT, f_name TEXT, t_name TEXT, surah TEXT, sq_p TEXT, sq_a INTEGER, sq_m INTEGER, m_p TEXT, m_a INTEGER, m_m INTEGER, attendance TEXT)''')
+    # اساتذہ کی حاضری
     c.execute('''CREATE TABLE IF NOT EXISTS t_attendance (id INTEGER PRIMARY KEY AUTOINCREMENT, t_name TEXT, manual_date DATE, manual_time TEXT, system_timestamp TEXT)''')
+    # رخصت کی درخواستیں
     c.execute('''CREATE TABLE IF NOT EXISTS leave_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, t_name TEXT, l_type TEXT, days INTEGER, reason TEXT, start_date DATE, status TEXT)''')
+    # امتحانات
     c.execute('''CREATE TABLE IF NOT EXISTS exams (id INTEGER PRIMARY KEY AUTOINCREMENT, s_name TEXT, f_name TEXT, para_no INTEGER, start_date TEXT, end_date TEXT, total INTEGER, grade TEXT, status TEXT)''')
     
-    # 🌟 آٹو اپ گریڈر: یہ Streamlit Cloud کے پرانے ڈیٹا بیس میں نئے کالمز خود بخود شامل کرے گا تاکہ کریش نہ ہو۔
-    cols_to_add = [
-        ("leave_requests", "l_type", "TEXT"), ("leave_requests", "days", "INTEGER"),
-        ("leave_requests", "reason", "TEXT"), ("leave_requests", "start_date", "DATE"),
-        ("leave_requests", "status", "TEXT"), ("t_attendance", "manual_date", "DATE"),
-        ("t_attendance", "manual_time", "TEXT"), ("t_attendance", "system_timestamp", "TEXT"),
-        ("hifz_records", "sq_a", "INTEGER"), ("hifz_records", "sq_m", "INTEGER"),
-        ("hifz_records", "m_a", "INTEGER"), ("hifz_records", "m_m", "INTEGER")
-    ]
-    for table, col, typ in cols_to_add:
-        try:
-            c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
-        except:
-            pass # اگر کالم پہلے سے موجود ہے تو ایرر کو نظر انداز کریں
-
+    # ایڈمن اکاؤنٹ (اگر نہ ہو)
     c.execute("INSERT OR IGNORE INTO teachers (name, password) VALUES (?,?)", ("admin", "jamia123"))
     conn.commit()
+
+init_db()
 
 # ==========================================
 # 2. اسٹائلنگ (RTL) اور پرنٹ کے فنکشنز
@@ -426,6 +413,7 @@ elif m == "🏛️ مہتمم پینل (رخصت)":
     if not df_lv.empty: st.markdown(generate_html_print(df_lv, "اساتذہ کی رخصت کا ریکارڈ"), unsafe_allow_html=True)
 
 conn.close()
+
 
 
 
