@@ -7,7 +7,7 @@ import base64
 # ==========================================
 # 1. ڈیٹا بیس سیٹ اپ اور کنکشن
 # ==========================================
-DB_NAME = 'jamia_millia_final.db'
+DB_NAME = 'jamia_millia_v1test.db'
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 c = conn.cursor()
 
@@ -406,3 +406,4 @@ elif m == "🏛️ مہتمم پینل (رخصت)":
     if not df_lv.empty: st.markdown(generate_html_print(df_lv, "اساتذہ کی رخصت کا ریکارڈ"), unsafe_allow_html=True)
 
 conn.close()
+
