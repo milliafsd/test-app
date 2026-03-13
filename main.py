@@ -7,7 +7,7 @@ import base64
 # ==========================================
 # 1. ڈیٹا بیس سیٹ اپ اور کنکشن
 # ==========================================
-DB_NAME = 'jamia_millia_v1test.db'
+DB_NAME = 'jamia_millia_final.db'
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 c = conn.cursor()
 
@@ -168,26 +168,18 @@ if m == "⚙️ انتظامی کنٹرول":
 # ==========================================
 # ماڈیول: تعلیمی اندراج (اساتذہ کے لیے)
 # ==========================================
-# ==========================================
-# ماڈیول: تعلیمی اندراج (اساتذہ کے لیے)
-# ==========================================
 elif m == "📝 تعلیمی اندراج":
     st.header("📝 یومیہ تعلیمی اندراج")
     sel_date = st.date_input("تاریخ منتخب کریں", get_pkt_time().date())
-    
-    raw_students = c.execute("SELECT name, father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()
+    students = c.execute("SELECT name, father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()
 
-    if not raw_students: 
-        st.warning("آپ کی کلاس میں کوئی طالب علم رجسٹرڈ نہیں ہے۔")
+    if not students: st.warning("آپ کی کلاس میں کوئی طالب علم نہیں ہے۔ منتظم سے رابطہ کریں۔")
     else:
-        for s_raw, f_raw in raw_students:
-            # 🌟 جادوئی صفائی: ناموں کے ساتھ لگی تمام فالتو چیزیں صاف
-            s = clean_text(s_raw)
-            f = clean_text(f_raw)
-            
+        for s, f in students:
             with st.expander(f"👤 {s} ولد {f}"):
                 att = st.radio(f"حاضری", ["حاضر", "غیر حاضر", "رخصت"], key=f"att_{s}", horizontal=True)
                 if att == "حاضر":
+                    # سبق
                     s_nagha = st.checkbox("سبق کا ناغہ", key=f"sn_{s}")
                     if not s_nagha:
                         c1, c2, c3 = st.columns([2, 1, 1])
@@ -197,7 +189,7 @@ elif m == "📝 تعلیمی اندراج":
                         sabq_final = f"{surah}: {a_from}-{a_to}"
                     else: sabq_final = "ناغہ"
 
-                    # سبقی
+                    # سبقی (Dynamic Rows)
                     sq_nagha = st.checkbox("سبقی کا ناغہ", key=f"sqn_{s}")
                     sq_list, sq_err, sq_atk = [], 0, 0
                     if not sq_nagha:
@@ -212,7 +204,7 @@ elif m == "📝 تعلیمی اندراج":
                         if st.button("➕ مزید سبقی", key=f"add_sq_{s}"): st.session_state[f"sq_c_{s}"] += 1; st.rerun()
                     else: sq_list = ["ناغہ"]
 
-                    # منزل
+                    # منزل (Dynamic Rows)
                     m_nagha = st.checkbox("منزل کا ناغہ", key=f"mn_{s}")
                     m_list, m_err, m_atk = [], 0, 0
                     if not m_nagha:
@@ -354,34 +346,30 @@ elif m == "📜 ماہانہ رزلٹ کارڈ":
             st.markdown(generate_html_print(df_month, f"ماہانہ رزلٹ کارڈ ({m_year}-{m_month:02d})"), unsafe_allow_html=True)
 
 # ==========================================
-# ماڈیول: اساتذہ کی حاضری اور رخصت
+# ماڈیول: اساتذہ کا ریکارڈ (حاضری)
 # ==========================================
 elif m == "🕒 میری حاضری":
     st.header("🕒 میری یومیہ حاضری")
     m_date = st.date_input("تاریخ", date.today())
     m_time = st.time_input("آمد کا وقت", get_pkt_time().time())
-    
     if st.button("حاضری درج کریں"):
         sys_t = get_pkt_time().strftime("%Y-%m-%d %H:%M:%S")
         chk = c.execute("SELECT 1 FROM t_attendance WHERE t_name=? AND manual_date=?", (st.session_state.username, str(m_date))).fetchone()
-        if chk: 
-            st.error("اس تاریخ کی حاضری پہلے ہی لگ چکی ہے۔")
+        if chk: st.error("اس تاریخ کی حاضری لگ چکی ہے۔")
         else:
             c.execute("INSERT INTO t_attendance (t_name, manual_date, manual_time, system_timestamp) VALUES (?,?,?,?)", (st.session_state.username, str(m_date), str(m_time), sys_t))
-            conn.commit()
-            st.success("✅ حاضری کامیابی سے درج ہو گئی!")
+            conn.commit(); st.success("حاضری درج ہو گئی!")
 
-elif m == "📩 درخواستِ رخصت":
-    st.header("📩 چھٹی کی درخواست بھیجیں")
-    with st.form("leave"):
-        l_type = st.selectbox("نوعیت", ["بیماری", "ضروری کام", "دیگر"])
-        days = st.number_input("کتنے دن؟", 1, 30)
-        rsn = st.text_area("تفصیل")
-        if st.form_submit_button("ارسال کریں"):
-            c.execute("INSERT INTO leave_requests (t_name, l_type, days, reason, start_date, status) VALUES (?,?,?,?,?,?)", (st.session_state.username, l_type, days, rsn, str(date.today()), "پینڈنگ"))
-            conn.commit()
-            st.success("✅ درخواست کامیابی سے بھیج دی گئی!")
-            
+elif m == "🕒 اساتذہ کا ریکارڈ":
+    st.header("🕒 اساتذہ کی حاضری کا ریکارڈ")
+    df_att = pd.read_sql_query("SELECT id as 'ID', t_name as 'استاد', manual_date as 'تاریخ', manual_time as 'وقتِ آمد' FROM t_attendance ORDER BY manual_date DESC", conn)
+    st.dataframe(df_att, use_container_width=True)
+    if not df_att.empty: st.markdown(generate_html_print(df_att.drop(columns=['ID']), "اساتذہ کی حاضری رپورٹ"), unsafe_allow_html=True)
+    
+    st.divider()
+    del_att = st.number_input("حذف کرنے کے لیے حاضری کی ID درج کریں", min_value=0, step=1, key="del_att")
+    if st.button("حاضری حذف کریں"): execute_delete("t_attendance", del_att)
+
 # ==========================================
 # ماڈیول: مہتمم پینل (رخصت)
 # ==========================================
@@ -418,9 +406,3 @@ elif m == "🏛️ مہتمم پینل (رخصت)":
     if not df_lv.empty: st.markdown(generate_html_print(df_lv, "اساتذہ کی رخصت کا ریکارڈ"), unsafe_allow_html=True)
 
 conn.close()
-
-
-
-
-
-
