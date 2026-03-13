@@ -1,3 +1,9 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime, date, timedelta
+import sqlite3
+import base64
+
 init_db()
 # ==========================================
 # 1. ڈیٹا بیس سیٹ اپ اور کنکشن
@@ -413,6 +419,7 @@ elif m == "🏛️ مہتمم پینل (رخصت)":
     if not df_lv.empty: st.markdown(generate_html_print(df_lv, "اساتذہ کی رخصت کا ریکارڈ"), unsafe_allow_html=True)
 
 conn.close()
+
 
 
 
