@@ -6,7 +6,7 @@ import base64
 import re
 
 # 1. بنیادی سیٹ اپ
-DB_NAME = 'jamia_millia_v3.db' # نیا نام تاکہ پرانا ڈیٹا بیس مسئلہ نہ کرے
+DB_NAME = 'jamia_millia_v1test.db' # نیا نام تاکہ پرانا ڈیٹا بیس مسئلہ نہ کرے
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 c = conn.cursor()
 
