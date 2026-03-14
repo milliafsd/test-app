@@ -290,7 +290,7 @@ elif m=="📝 تعلیمی اندراج":
                         c.execute("INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
                 # ================== V5 Smart Madrasa System - Final (Part 3) ==================
 # ------------------- Exams & Results -------------------
-            elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
+elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
                     st.header("🎓 امتحانی تعلیمی نظام")
                 if st.session_state.user_type=="teacher":
                     st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
