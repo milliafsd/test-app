@@ -1,6 +1,13 @@
 import streamlit as st
-import plotly.express as px
 import pandas as pd
+
+# Plotly کو پیار سے امپورٹ کریں، اگر نہیں ہے تو ایپ کو چلنے دیں
+try:
+    import plotly.express as px
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+
 from datetime import datetime, date, timedelta
 import sqlite3
 import base64
