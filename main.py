@@ -229,109 +229,110 @@ if m=="⚙️ انتظامی کنٹرول":
 # =====================================================================
 # Teacher: Daily Hifz Entry (حفظ اندراج)
 # =====================================================================
-elif m=="📝 تعلیمی اندراج":
+elif m == "📝 تعلیمی اندراج":
     st.header("📝 یومیہ تعلیمی اندراج")
     sel_date = st.date_input("تاریخ منتخب کریں", get_pkt_time().date())
-    students = c.execute("SELECT name,father_name FROM students WHERE teacher_name=?",(st.session_state.username,)).fetchall()
-    
-    if not students: st.warning("آپ کی کلاس میں کوئی طالبہ نہیں ہے۔ منتظمہ سے رابطہ کریں۔")
+    students = c.execute("SELECT name,father_name FROM students WHERE teacher_name=?", 
+                         (st.session_state.username,)).fetchall()
+
+    if not students:
+        st.warning("آپ کی کلاس میں کوئی طالبہ نہیں ہے۔ منتظمہ سے رابطہ کریں۔")
     else:
-        for s,f in students:
+        for s, f in students:
             with st.expander(f"👤 {s} بنت {f}"):
                 att = st.radio("حاضری", ["حاضر","غیر حاضر","رخصت"], key=f"att_{s}", horizontal=True)
-                if att=="حاضر":
+                
+                if att == "حاضر":
                     # سبق
                     s_nagha = st.checkbox("سبق کا ناغہ", key=f"sn_{s}")
                     if not s_nagha:
-                        c1,c2,c3 = st.columns([2,1,1])
-                        surah = c1.selectbox("سورت", surahs_urdu,key=f"surah_{s}")
-                        a_from = c2.text_input("آیت سے",key=f"af_{s}")
-                        a_to = c3.text_input("آیت تک",key=f"at_{s}")
+                        c1, c2, c3 = st.columns([2,1,1])
+                        surah = c1.selectbox("سورت", surahs_urdu, key=f"surah_{s}")
+                        a_from = c2.text_input("آیت سے", key=f"af_{s}")
+                        a_to = c3.text_input("آیت تک", key=f"at_{s}")
                         sabq_final = f"{surah}: {a_from}-{a_to}"
-                    else: sabq_final="ناغہ"
+                    else:
+                        sabq_final = "ناغہ"
 
                     # سبقی
-                    sq_nagha = st.checkbox("سبقی کا ناغہ",key=f"sqn_{s}")
-                    sq_list,sq_err,sq_atk=[],0,0
+                    sq_nagha = st.checkbox("سبقی کا ناغہ", key=f"sqn_{s}")
+                    sq_list, sq_err, sq_atk = [], 0, 0
                     if not sq_nagha:
-                        if f"sq_c_{s}" not in st.session_state: st.session_state[f"sq_c_{s}"]=1
+                        if f"sq_c_{s}" not in st.session_state: st.session_state[f"sq_c_{s}"] = 1
                         for i in range(st.session_state[f"sq_c_{s}"]):
                             c1,c2,c3,c4 = st.columns([2,2,1,1])
-                            p = c1.selectbox(f"پارہ",paras,key=f"sqp_{s}_{i}")
-                            v = c2.selectbox(f"مقدار",["مکمل","آدھا","پون","پاؤ"],key=f"sqv_{s}_{i}")
+                            p = c1.selectbox(f"پارہ", paras, key=f"sqp_{s}_{i}")
+                            v = c2.selectbox(f"مقدار", ["مکمل","آدھا","پون","پاؤ"], key=f"sqv_{s}_{i}")
                             a = c3.number_input(f"اٹکن",0,key=f"sqa_{s}_{i}")
                             e = c4.number_input(f"غلطی",0,key=f"sqe_{s}_{i}")
-                            sq_list.append(f"{p}:{v}"); sq_atk+=a; sq_err+=e
-                        if st.button("➕ مزید سبقی",key=f"add_sq_{s}"): st.session_state[f"sq_c_{s}"]+=1; st.rerun()
-                    else: sq_list=["ناغہ"]
+                            sq_list.append(f"{p}:{v}"); sq_atk += a; sq_err += e
+                        if st.button("➕ مزید سبقی", key=f"add_sq_{s}"):
+                            st.session_state[f"sq_c_{s}"] += 1
+                            st.rerun()
+                    else:
+                        sq_list = ["ناغہ"]
 
                     # منزل
-                    m_nagha = st.checkbox("منزل کا ناغہ",key=f"mn_{s}")
-                    m_list,m_err,m_atk=[],0,0
+                    m_nagha = st.checkbox("منزل کا ناغہ", key=f"mn_{s}")
+                    m_list, m_err, m_atk = [], 0, 0
                     if not m_nagha:
-                        if f"m_c_{s}" not in st.session_state: st.session_state[f"m_c_{s}"]=1
+                        if f"m_c_{s}" not in st.session_state: st.session_state[f"m_c_{s}"] = 1
                         for i in range(st.session_state[f"m_c_{s}"]):
                             c1,c2,c3,c4 = st.columns([2,2,1,1])
-                            p = c1.selectbox(f"پارہ",paras,key=f"mp_{s}_{i}")
-                            v = c2.selectbox(f"مقدار",["مکمل","آدھا","پون","پاؤ"],key=f"mv_{s}_{i}")
+                            p = c1.selectbox(f"پارہ", paras, key=f"mp_{s}_{i}")
+                            v = c2.selectbox(f"مقدار", ["مکمل","آدھا","پون","پاؤ"], key=f"mv_{s}_{i}")
                             a = c3.number_input(f"اٹکن",0,key=f"ma_{s}_{i}")
                             e = c4.number_input(f"غلطی",0,key=f"me_{s}_{i}")
-                            m_list.append(f"{p}:{v}"); m_atk+=a; m_err+=e
-                        if st.button("➕ مزید منزل",key=f"add_m_{s}"): st.session_state[f"m_c_{s}"]+=1; st.rerun()
-                    else: m_list=["ناغہ"]
+                            m_list.append(f"{p}:{v}"); m_atk += a; m_err += e
+                        if st.button("➕ مزید منزل", key=f"add_m_{s}"):
+                            st.session_state[f"m_c_{s}"] += 1
+                            st.rerun()
+                    else:
+                        m_list = ["ناغہ"]
 
-                    if st.button("محفوظ کریں",key=f"save_{s}"):
-                        c.execute("INSERT INTO hifz_records (r_date,s_name,f_name,t_name,surah,sq_p,sq_a,sq_m,m_p,m_a,m_m,attendance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                                  (str(sel_date),s,f,st.session_state.username,sabq_final," | ".join(sq_list),sq_atk,sq_err," | ".join(m_list),m_atk,m_err,att))
+                    # محفوظ کریں
+                    if st.button("محفوظ کریں", key=f"save_{s}"):
+                        c.execute(
+                            "INSERT INTO hifz_records (r_date,s_name,f_name,t_name,surah,sq_p,sq_a,sq_m,m_p,m_a,m_m,attendance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (str(sel_date), s, f, st.session_state.username, sabq_final, " | ".join(sq_list),
+                             sq_atk, sq_err, " | ".join(m_list), m_atk, m_err, att)
+                        )
                         conn.commit()
                         st.toast("ریکارڈ کامیابی سے محفوظ ہو گیا! ✅")
-                else:
-                    if st.button("حاضری لگائیں",key=f"save_absent_{s}"):
-                        c.execute("INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
-                # ================== V5 Smart Madrasa System - Final (Part 3) ==================
-# ------------------- Exams & Results -------------------
+                
+                else:  # غیر حاضر یا رخصت
+                    if st.button("حاضری لگائیں", key=f"save_absent_{s}"):
+                        c.execute(
+                            "INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
+                            (str(sel_date), s, f, st.session_state.username, att, "-", "-", "-")
+                        )
+                        conn.commit()
+                        st.toast(f"{att} لگ گئی! ✅")
+
+# =====================================================================
+# Exams & Results (امتحانات و نتائج)
+# =====================================================================
 elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
-                    st.header("🎓 امتحانی تعلیمی نظام")
-                if st.session_state.user_type=="teacher":
-                    st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
-                    my_students = [f"{s[0]} بنت {s[1]}" for s in c.execute("SELECT name,father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()]
-                if my_students:
-                    sel_s = st.selectbox("طالبہ منتخب کریں", my_students)
+    st.header("🎓 امتحانی تعلیمی نظام")
+    if st.session_state.user_type=="teacher":
+        st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
+        my_students = [f"{s[0]} بنت {s[1]}" for s in c.execute(
+            "SELECT name,father_name FROM students WHERE teacher_name=?", 
+            (st.session_state.username,)
+        ).fetchall()]
+        if my_students:
+            sel_s = st.selectbox("طالبہ منتخب کریں", my_students)
             para_no = st.number_input("پارہ نمبر", 1, 30)
             if st.button("امتحان کی درخواست بھیجیں"):
                 sn, fn = sel_s.split(" بنت ")
-                c.execute("INSERT INTO exams (s_name,f_name,para_no,start_date,status) VALUES (?,?,?,?,?)",(sn,fn,para_no,str(date.today()),"پینڈنگ"))
+                c.execute(
+                    "INSERT INTO exams (s_name,f_name,para_no,start_date,status) VALUES (?,?,?,?,?)",
+                    (sn, fn, para_no, str(date.today()), "پینڈنگ")
+                )
                 conn.commit()
                 st.success("امتحان کی درخواست کامیابی سے بھیج دی گئی!")
-        else: st.warning("آپ کی کلاس میں کوئی طالبہ نہیں ہے۔")
-    else:
-        tab1, tab2 = st.tabs(["📥 پینڈنگ امتحانات","📜 امتحانی ریکارڈ (پرنٹ/ترمیم)"])
-        with tab1:
-            pending = c.execute("SELECT id,s_name,f_name,para_no FROM exams WHERE status='پینڈنگ'").fetchall()
-            if not pending: st.info("اس وقت کوئی پینڈنگ امتحان نہیں ہے۔")
-            for eid,sn,fn,pn in pending:
-                with st.expander(f"📝 {sn} بنت {fn} - پارہ {pn}"):
-                    c1,c2,c3,c4,c5 = st.columns(5)
-                    q1 = c1.number_input("سوال 1",0,20,key=f"q1_{eid}")
-                    q2 = c2.number_input("سوال 2",0,20,key=f"q2_{eid}")
-                    q3 = c3.number_input("سوال 3",0,20,key=f"q3_{eid}")
-                    q4 = c4.number_input("سوال 4",0,20,key=f"q4_{eid}")
-                    q5 = c5.number_input("سوال 5",0,20,key=f"q5_{eid}")
-                    tot = q1+q2+q3+q4+q5
-                    st.write(f"**کل نمبر:** {tot} / 100")
-                    if st.button("نتیجہ محفوظ کریں",key=f"sv_{eid}"):
-                        g = "ممتاز" if tot>=90 else "جید جداً" if tot>=80 else "جید" if tot>=70 else "مقبول" if tot>=60 else "فیل"
-                        c.execute("UPDATE exams SET total=?,grade=?,status='مکمل',end_date=? WHERE id=?",(tot,g,str(date.today()),eid))
-                        conn.commit()
-                        st.success("نتیجہ محفوظ ہو گیا!")
-                        st.rerun()
-        with tab2:
-            df_exams = pd.read_sql_query("SELECT id as 'ID', s_name as 'نام', f_name as 'ولدیت', para_no as 'پارہ', total as 'نمبر', grade as 'گریڈ', end_date as 'تاریخ' FROM exams WHERE status='مکمل'",conn)
-            st.dataframe(df_exams,use_container_width=True)
-            if not df_exams.empty: st.markdown(generate_html_print(df_exams.drop(columns=['ID']),"امتحانی ریکارڈ"),unsafe_allow_html=True)
-            st.divider()
-            del_ex = st.number_input("حذف کرنے کے لیے امتحان کی ID درج کریں",min_value=0,step=1,key="del_ex")
-            if st.button("امتحان حذف کریں"): execute_delete("exams",del_ex)
+        else:
+            st.warning("آپ کی کلاس میں کوئی طالبہ نہیں ہے۔")
 
 # ------------------- Teacher Attendance -------------------
 elif m=="🕒 میری حاضری":
