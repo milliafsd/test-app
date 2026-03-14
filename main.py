@@ -289,11 +289,10 @@ elif m=="📝 تعلیمی اندراج":
                     if st.button("حاضری لگائیں",key=f"save_absent_{s}"):
                         c.execute("INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
                 # ================== V5 Smart Madrasa System - Final (Part 3) ==================
-
 # ------------------- Exams & Results -------------------
-                elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
+            elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
                     st.header("🎓 امتحانی تعلیمی نظام")
-                    if st.session_state.user_type=="teacher":
+                if st.session_state.user_type=="teacher":
                     st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
                     my_students = [f"{s[0]} بنت {s[1]}" for s in c.execute("SELECT name,father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()]
                 if my_students:
