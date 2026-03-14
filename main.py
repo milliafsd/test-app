@@ -8,7 +8,7 @@ import re
 # ==========================================
 # 1. ڈیٹا بیس سیٹ اپ اور آٹو اپ گریڈ
 # ==========================================
-DB_NAME = 'jamia_millia_final.db'
+DB_NAME = 'jamia_millia_v1test.db'
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 c = conn.cursor()
 
