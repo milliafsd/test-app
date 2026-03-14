@@ -411,7 +411,7 @@ elif m=="📜 ماہانہ رزلٹ کارڈ":
         q+=" GROUP BY s_name"
         df_month = pd.read_sql_query(q,conn,params=p)
         if df_month.empty: st.warning("اس مہینے کا کوئی ریکارڈ نہیں ملا۔")
-       else:  # غیر حاضر یا رخصت
+   else:  # غیر حاضر یا رخصت
     if st.button("حاضری لگائیں", key=f"save_absent_{s}"):
         c.execute(
             "INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
