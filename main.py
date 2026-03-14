@@ -288,6 +288,131 @@ elif m=="📝 تعلیمی اندراج":
                 else:
                     if st.button("حاضری لگائیں",key=f"save_absent_{s}"):
                         c.execute("INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
+                # ================== V5 Smart Madrasa System - Final (Part 3) ==================
+
+# ------------------- Exams & Results -------------------
+elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
+    st.header("🎓 امتحانی تعلیمی نظام")
+    if st.session_state.user_type=="teacher":
+        st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
+        my_students = [f"{s[0]} بنت {s[1]}" for s in c.execute("SELECT name,father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()]
+        if my_students:
+            sel_s = st.selectbox("طالبہ منتخب کریں", my_students)
+            para_no = st.number_input("پارہ نمبر", 1, 30)
+            if st.button("امتحان کی درخواست بھیجیں"):
+                sn, fn = sel_s.split(" بنت ")
+                c.execute("INSERT INTO exams (s_name,f_name,para_no,start_date,status) VALUES (?,?,?,?,?)",(sn,fn,para_no,str(date.today()),"پینڈنگ"))
+                conn.commit()
+                st.success("امتحان کی درخواست کامیابی سے بھیج دی گئی!")
+        else: st.warning("آپ کی کلاس میں کوئی طالبہ نہیں ہے۔")
+    else:
+        tab1, tab2 = st.tabs(["📥 پینڈنگ امتحانات","📜 امتحانی ریکارڈ (پرنٹ/ترمیم)"])
+        with tab1:
+            pending = c.execute("SELECT id,s_name,f_name,para_no FROM exams WHERE status='پینڈنگ'").fetchall()
+            if not pending: st.info("اس وقت کوئی پینڈنگ امتحان نہیں ہے۔")
+            for eid,sn,fn,pn in pending:
+                with st.expander(f"📝 {sn} بنت {fn} - پارہ {pn}"):
+                    c1,c2,c3,c4,c5 = st.columns(5)
+                    q1 = c1.number_input("سوال 1",0,20,key=f"q1_{eid}")
+                    q2 = c2.number_input("سوال 2",0,20,key=f"q2_{eid}")
+                    q3 = c3.number_input("سوال 3",0,20,key=f"q3_{eid}")
+                    q4 = c4.number_input("سوال 4",0,20,key=f"q4_{eid}")
+                    q5 = c5.number_input("سوال 5",0,20,key=f"q5_{eid}")
+                    tot = q1+q2+q3+q4+q5
+                    st.write(f"**کل نمبر:** {tot} / 100")
+                    if st.button("نتیجہ محفوظ کریں",key=f"sv_{eid}"):
+                        g = "ممتاز" if tot>=90 else "جید جداً" if tot>=80 else "جید" if tot>=70 else "مقبول" if tot>=60 else "فیل"
+                        c.execute("UPDATE exams SET total=?,grade=?,status='مکمل',end_date=? WHERE id=?",(tot,g,str(date.today()),eid))
+                        conn.commit()
+                        st.success("نتیجہ محفوظ ہو گیا!")
+                        st.rerun()
+        with tab2:
+            df_exams = pd.read_sql_query("SELECT id as 'ID', s_name as 'نام', f_name as 'ولدیت', para_no as 'پارہ', total as 'نمبر', grade as 'گریڈ', end_date as 'تاریخ' FROM exams WHERE status='مکمل'",conn)
+            st.dataframe(df_exams,use_container_width=True)
+            if not df_exams.empty: st.markdown(generate_html_print(df_exams.drop(columns=['ID']),"امتحانی ریکارڈ"),unsafe_allow_html=True)
+            st.divider()
+            del_ex = st.number_input("حذف کرنے کے لیے امتحان کی ID درج کریں",min_value=0,step=1,key="del_ex")
+            if st.button("امتحان حذف کریں"): execute_delete("exams",del_ex)
+
+# ------------------- Teacher Attendance -------------------
+elif m=="🕒 میری حاضری":
+    st.header("🕒 میری یومیہ حاضری")
+    c1,c2 = st.columns(2)
+    m_date = c1.date_input("تاریخ", date.today())
+    m_time = c2.time_input("آمد کا وقت", get_pkt_time().time())
+    if st.button("حاضری درج کریں"):
+        sys_t = get_pkt_time().strftime("%Y-%m-%d %H:%M:%S")
+        chk = c.execute("SELECT 1 FROM t_attendance WHERE t_name=? AND manual_date=?",(st.session_state.username,str(m_date))).fetchone()
+        if chk: st.error("اس تاریخ کی حاضری پہلے ہی لگ چکی ہے۔")
+        else:
+            c.execute("INSERT INTO t_attendance (t_name,manual_date,manual_time,system_timestamp) VALUES (?,?,?,?)",(st.session_state.username,str(m_date),str(m_time),sys_t))
+            conn.commit()
+            st.success("حاضری کامیابی سے درج ہو گئی!")
+
+elif m=="🕒 استاذہ کا ریکارڈ":
+    st.header("🕒 استاذہ کی حاضری کا ریکارڈ")
+    df_att = pd.read_sql_query("SELECT id as 'ID', t_name as 'استاد', manual_date as 'تاریخ', manual_time as 'وقتِ آمد' FROM t_attendance ORDER BY manual_date DESC",conn)
+    st.dataframe(df_att,use_container_width=True)
+    if not df_att.empty: st.markdown(generate_html_print(df_att.drop(columns=['ID']),"اساتذہ کی حاضری رپورٹ"),unsafe_allow_html=True)
+    st.divider()
+    del_att = st.number_input("حذف کرنے کے لیے حاضری کی ID درج کریں",min_value=0,step=1,key="del_att")
+    if st.button("حاضری حذف کریں"): execute_delete("t_attendance",del_att)
+
+# ------------------- Leave Requests -------------------
+elif m=="📩 درخواستِ رخصت":
+    st.header("📩 چھٹی کی درخواست بھیجیں")
+    with st.form("leave"):
+        l_type = st.selectbox("نوعیت",["بیماری","ضروری کام","دیگر"])
+        days = st.number_input("کتنے دن کے لیے؟",1,30)
+        rsn = st.text_area("تفصیلی وجہ")
+        if st.form_submit_button("ارسال کریں"):
+            c.execute("INSERT INTO leave_requests (t_name,l_type,days,reason,start_date,status) VALUES (?,?,?,?,?,?)",
+                      (st.session_state.username,l_type,days,rsn,str(date.today()),"پینڈنگ"))
+            conn.commit()
+            st.success("درخواست مہتممہ کو بھیج دی گئی!")
+
+elif m=="🏛️ مہتممہ پینل (رخصت)":
+    st.header("🏛️ مہتممہ پینل - درخواستِ رخصت")
+    reqs = c.execute("SELECT id,t_name,l_type,days,reason,start_date FROM leave_requests WHERE status='پینڈنگ'").fetchall()
+    if not reqs: st.info("اس وقت چھٹی کی کوئی نئی درخواست نہیں ہے۔")
+    for rid,tn,lt,d,rsn,sd in reqs:
+        with st.expander(f"درخواست: {tn} ({lt} - {d} دن)"):
+            st.write(f"**تفصیل:** {rsn}")
+            st.write(f"**تاریخِ آغاز:** {sd}")
+            c1,c2 = st.columns(2)
+            if c1.button("✅ منظور کریں",key=f"app_{rid}"):
+                c.execute("UPDATE leave_requests SET status='منظور' WHERE id=?",(rid,))
+                conn.commit()
+                st.rerun()
+            if c2.button("❌ مسترد کریں",key=f"rej_{rid}"):
+                c.execute("UPDATE leave_requests SET status='مسترد' WHERE id=?",(rid,))
+                conn.commit()
+                st.rerun()
+    st.divider()
+    st.subheader("سابقہ رخصت کا ریکارڈ")
+    df_lv = pd.read_sql_query("SELECT t_name as 'استاد', l_type as 'نوعیت', days as 'دن', start_date as 'تاریخ', status as 'سٹیٹس' FROM leave_requests WHERE status!='پینڈنگ'",conn)
+    st.dataframe(df_lv,use_container_width=True)
+    if not df_lv.empty: st.markdown(generate_html_print(df_lv,"اساتذہ کی رخصت کا ریکارڈ"),unsafe_allow_html=True)
+
+# ------------------- Monthly Report -------------------
+elif m=="📜 ماہانہ رزلٹ کارڈ":
+    st.header("📜 ماہانہ رزلٹ کارڈ (Generate & Print)")
+    c1,c2,c3 = st.columns(3)
+    m_year = c1.selectbox("سال",[2024,2025,2026])
+    m_month = c2.selectbox("مہینہ",range(1,13))
+    t_list = ["تمام"] + [row[0] for row in c.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
+    sel_t = c3.selectbox("استاذہ",t_list)
+    if st.button("رپورٹ تیار کریں"):
+        start_dt = f"{m_year}-{m_month:02d}-01"
+        end_dt = f"{m_year}-{m_month:02d}-31"
+        q = "SELECT s_name as 'نام', COUNT(*) as 'کل دن', SUM(CASE WHEN attendance='حاضر' THEN 1 ELSE 0 END) as 'حاضریاں', SUM(CASE WHEN attendance!='حاضر' THEN 1 ELSE 0 END) as 'چھٹیاں', SUM(sq_m) as 'کل سبقی غلطیاں', SUM(m_m) as 'کل منزل غلطیاں' FROM hifz_records WHERE r_date BETWEEN ? AND ?"
+        p = [start_dt,end_dt]
+        if sel_t!="تمام": q+=" AND t_name=?"; p.append(sel_t)
+        q+=" GROUP BY s_name"
+        df_month = pd.read_sql_query(q,conn,params=p)
+        if df_month.empty: st.warning("اس مہینے کا کوئی ریکارڈ نہیں ملا۔")
+        else: st.dataframe(df_month,use_container_width=True)
+        st.markdown(generate_html_print(df_month,f"ماہانہ رزلٹ کارڈ ({m_year}-{m_month:02d})"),unsafe_allow_html=True)
                                   (str(sel_date),s,f,st.session_state.username,att,"-","-","-"))
                         conn.commit()
                         st.toast(f"{att} لگ گئی! ✅")
