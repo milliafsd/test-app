@@ -4,12 +4,20 @@ import pandas as pd
 import qrcode
 from datetime import date
 import shutil
+import os
+
+# =========================
+# FOLDER SETUP
+# =========================
+
+if not os.path.exists("student_photos"):
+    os.makedirs("student_photos")
 
 # =========================
 # DATABASE
 # =========================
 
-conn = sqlite3.connect("madrasa.db",check_same_thread=False)
+conn = sqlite3.connect("madrasa_v4.db",check_same_thread=False)
 c = conn.cursor()
 
 def init_db():
@@ -17,7 +25,7 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS teachers(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
+    name TEXT UNIQUE,
     password TEXT
     )
     """)
@@ -29,16 +37,20 @@ def init_db():
     father TEXT,
     gender TEXT,
     teacher TEXT,
-    phone TEXT
+    phone TEXT,
+    photo TEXT
     )
     """)
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS hifz(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    s_name TEXT,
+    student TEXT,
     lesson TEXT,
-    mistake INTEGER,
+    sabqi TEXT,
+    manzil TEXT,
+    para INTEGER,
+    mistakes INTEGER,
     date TEXT
     )
     """)
@@ -50,10 +62,10 @@ def init_db():
 init_db()
 
 # =========================
-# STYLE
+# PAGE CONFIG
 # =========================
 
-st.set_page_config(page_title="جامعہ ملیہ سسٹم",layout="wide")
+st.set_page_config(page_title="جامعہ ملیہ حفظ سسٹم",layout="wide")
 
 st.markdown("""
 <style>
@@ -88,12 +100,12 @@ if not st.session_state.login:
 
     st.title("🕌 جامعہ ملیہ اسلامیہ")
 
-    u = st.text_input("صارف نام")
-    p = st.text_input("پاسورڈ",type="password")
+    u=st.text_input("صارف نام")
+    p=st.text_input("پاسورڈ",type="password")
 
-    if st.button("لاگ ان"):
+    if st.button("لاگ ان کریں"):
 
-        r = c.execute("SELECT * FROM teachers WHERE name=? AND password=?",(u,p)).fetchone()
+        r=c.execute("SELECT * FROM teachers WHERE name=? AND password=?",(u,p)).fetchone()
 
         if r:
             st.session_state.login=True
@@ -109,9 +121,9 @@ if not st.session_state.login:
 # MENU
 # =========================
 
-menu = st.sidebar.radio("مینو",[
+menu=st.sidebar.radio("مینو",[
 "🏠 ڈیش بورڈ",
-"👨‍🎓 طلباء/طالبات",
+"👨‍🎓 طلباء / طالبات",
 "📝 سبق اندراج",
 "📊 رپورٹ",
 "🔎 تلاش",
@@ -125,28 +137,30 @@ menu = st.sidebar.radio("مینو",[
 
 if menu=="🏠 ڈیش بورڈ":
 
-    st.title("📊 ڈیش بورڈ")
+    st.title("📊 مدرسہ ڈیش بورڈ")
 
-    s_total=c.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-    t_total=c.execute("SELECT COUNT(*) FROM teachers").fetchone()[0]
+    total=c.execute("SELECT COUNT(*) FROM students").fetchone()[0]
 
-    today=date.today()
+    boys=c.execute("SELECT COUNT(*) FROM students WHERE gender='طالب علم'").fetchone()[0]
 
-    today_lesson=c.execute("SELECT COUNT(*) FROM hifz WHERE date=?",(str(today),)).fetchone()[0]
+    girls=c.execute("SELECT COUNT(*) FROM students WHERE gender='طالبہ'").fetchone()[0]
 
-    c1,c2,c3=st.columns(3)
+    teachers=c.execute("SELECT COUNT(*) FROM teachers").fetchone()[0]
 
-    c1.metric("کل طلباء و طالبات",s_total)
-    c2.metric("کل اساتذہ",t_total)
-    c3.metric("آج کے اسباق",today_lesson)
+    c1,c2,c3,c4=st.columns(4)
+
+    c1.metric("کل طلباء",boys)
+    c2.metric("کل طالبات",girls)
+    c3.metric("کل طلباء و طالبات",total)
+    c4.metric("کل اساتذہ",teachers)
 
 # =========================
-# STUDENT ADD
+# STUDENT ENTRY
 # =========================
 
-if menu=="👨‍🎓 طلباء/طالبات":
+if menu=="👨‍🎓 طلباء / طالبات":
 
-    st.header("طالب علم داخلہ")
+    st.header("طالب علم داخلہ فارم")
 
     name=st.text_input("نام")
     father=st.text_input("ولدیت")
@@ -157,12 +171,23 @@ if menu=="👨‍🎓 طلباء/طالبات":
 
     phone=st.text_input("فون")
 
+    photo=st.file_uploader("تصویر اپلوڈ کریں")
+
+    photo_path=""
+
     if st.button("محفوظ کریں"):
 
+        if photo:
+
+            photo_path=f"student_photos/{name}.jpg"
+
+            with open(photo_path,"wb") as f:
+                f.write(photo.getbuffer())
+
         c.execute("""
-        INSERT INTO students(name,father,gender,teacher,phone)
-        VALUES(?,?,?,?,?)
-        """,(name,father,gender,teacher,phone))
+        INSERT INTO students(name,father,gender,teacher,phone,photo)
+        VALUES(?,?,?,?,?,?)
+        """,(name,father,gender,teacher,phone,photo_path))
 
         conn.commit()
 
@@ -188,14 +213,20 @@ if menu=="📝 سبق اندراج":
 
     lesson=st.text_input("سبق")
 
-    mistake=st.number_input("غلطیاں",0)
+    sabqi=st.text_input("سبقی")
+
+    manzil=st.text_input("منزل")
+
+    para=st.number_input("پارہ نمبر",1,30)
+
+    mistakes=st.number_input("غلطیاں",0)
 
     if st.button("محفوظ"):
 
         c.execute("""
-        INSERT INTO hifz(s_name,lesson,mistake,date)
-        VALUES(?,?,?,?)
-        """,(s,lesson,mistake,str(date.today())))
+        INSERT INTO hifz(student,lesson,sabqi,manzil,para,mistakes,date)
+        VALUES(?,?,?,?,?,?,?)
+        """,(s,lesson,sabqi,manzil,para,mistakes,str(date.today())))
 
         conn.commit()
 
@@ -230,7 +261,16 @@ if menu=="🔎 تلاش":
         WHERE name LIKE '%{s}%'
         """,conn)
 
-        st.dataframe(df)
+        for i,row in df.iterrows():
+
+            st.subheader(row["name"])
+
+            if row["photo"]:
+                st.image(row["photo"],width=120)
+
+            st.write("ولدیت:",row["father"])
+            st.write("استاد:",row["teacher"])
+            st.write("فون:",row["phone"])
 
 # =========================
 # QR CARD
@@ -262,6 +302,6 @@ if menu=="💾 بیک اپ":
 
     if st.button("Backup بنائیں"):
 
-        shutil.copy("madrasa.db","backup.db")
+        shutil.copy("madrasa_v4.db","backup.db")
 
         st.success("Backup بن گیا")
