@@ -291,13 +291,13 @@ elif m=="📝 تعلیمی اندراج":
                 # ================== V5 Smart Madrasa System - Final (Part 3) ==================
 
 # ------------------- Exams & Results -------------------
-elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
-    st.header("🎓 امتحانی تعلیمی نظام")
-    if st.session_state.user_type=="teacher":
-        st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
-        my_students = [f"{s[0]} بنت {s[1]}" for s in c.execute("SELECT name,father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()]
-        if my_students:
-            sel_s = st.selectbox("طالبہ منتخب کریں", my_students)
+                elif m in ["🎓 امتحان کے لیے نامزدگی","🎓 امتحانات و نتائج"]:
+                    st.header("🎓 امتحانی تعلیمی نظام")
+                    if st.session_state.user_type=="teacher":
+                    st.subheader("طالبہ کو امتحان کے لیے بھیجیں")
+                    my_students = [f"{s[0]} بنت {s[1]}" for s in c.execute("SELECT name,father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()]
+                if my_students:
+                    sel_s = st.selectbox("طالبہ منتخب کریں", my_students)
             para_no = st.number_input("پارہ نمبر", 1, 30)
             if st.button("امتحان کی درخواست بھیجیں"):
                 sn, fn = sel_s.split(" بنت ")
