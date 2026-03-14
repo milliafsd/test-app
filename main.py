@@ -397,25 +397,35 @@ elif m=="🏛️ مہتممہ پینل (رخصت)":
 # ------------------- Monthly Report -------------------
 elif m=="📜 ماہانہ رزلٹ کارڈ":
     st.header("📜 ماہانہ رزلٹ کارڈ (Generate & Print)")
-    c1,c2,c3 = st.columns(3)
-    m_year = c1.selectbox("سال",[2024,2025,2026])
-    m_month = c2.selectbox("مہینہ",range(1,13))
+    c1, c2, c3 = st.columns(3)
+    m_year = c1.selectbox("سال", [2024, 2025, 2026])
+    m_month = c2.selectbox("مہینہ", range(1, 13))
     t_list = ["تمام"] + [row[0] for row in c.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
-    sel_t = c3.selectbox("استاذہ",t_list)
+    sel_t = c3.selectbox("استاذہ", t_list)
+
     if st.button("رپورٹ تیار کریں"):
         start_dt = f"{m_year}-{m_month:02d}-01"
         end_dt = f"{m_year}-{m_month:02d}-31"
-        q = "SELECT s_name as 'نام', COUNT(*) as 'کل دن', SUM(CASE WHEN attendance='حاضر' THEN 1 ELSE 0 END) as 'حاضریاں', SUM(CASE WHEN attendance!='حاضر' THEN 1 ELSE 0 END) as 'چھٹیاں', SUM(sq_m) as 'کل سبقی غلطیاں', SUM(m_m) as 'کل منزل غلطیاں' FROM hifz_records WHERE r_date BETWEEN ? AND ?"
-        p = [start_dt,end_dt]
-        if sel_t!="تمام": q+=" AND t_name=?"; p.append(sel_t)
-        q+=" GROUP BY s_name"
-        df_month = pd.read_sql_query(q,conn,params=p)
-        if df_month.empty: st.warning("اس مہینے کا کوئی ریکارڈ نہیں ملا۔")
-   else:  # غیر حاضر یا رخصت
-    if st.button("حاضری لگائیں", key=f"save_absent_{s}"):
-        c.execute(
-            "INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
-            (str(sel_date), s, f, st.session_state.username, att, "-", "-", "-")
-        )
-        conn.commit()
-        st.toast(f"{att} لگ گئی! ✅")
+        q = """SELECT s_name as 'نام', 
+                      COUNT(*) as 'کل دن', 
+                      SUM(CASE WHEN attendance='حاضر' THEN 1 ELSE 0 END) as 'حاضریاں', 
+                      SUM(CASE WHEN attendance!='حاضر' THEN 1 ELSE 0 END) as 'چھٹیاں', 
+                      SUM(sq_m) as 'کل سبقی غلطیاں', 
+                      SUM(m_m) as 'کل منزل غلطیاں' 
+               FROM hifz_records 
+               WHERE r_date BETWEEN ? AND ?"""
+        p = [start_dt, end_dt]
+        if sel_t != "تمام": 
+            q += " AND t_name=?"
+            p.append(sel_t)
+        q += " GROUP BY s_name"
+
+        df_month = pd.read_sql_query(q, conn, params=p)
+        if df_month.empty: 
+            st.warning("اس مہینے کا کوئی ریکارڈ نہیں ملا۔")
+        else:
+            st.dataframe(df_month, use_container_width=True)
+            st.markdown(
+                generate_html_print(df_month, f"ماہانہ رزلٹ کارڈ ({m_year}-{m_month:02d})"),
+                unsafe_allow_html=True
+            )
