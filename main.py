@@ -411,8 +411,11 @@ elif m=="📜 ماہانہ رزلٹ کارڈ":
         q+=" GROUP BY s_name"
         df_month = pd.read_sql_query(q,conn,params=p)
         if df_month.empty: st.warning("اس مہینے کا کوئی ریکارڈ نہیں ملا۔")
-        else: st.dataframe(df_month,use_container_width=True)
-        st.markdown(generate_html_print(df_month,f"ماہانہ رزلٹ کارڈ ({m_year}-{m_month:02d})"),unsafe_allow_html=True)
-        (str(sel_date),s,f,st.session_state.username,att,"-","-","-"))
+       else:  # غیر حاضر یا رخصت
+    if st.button("حاضری لگائیں", key=f"save_absent_{s}"):
+        c.execute(
+            "INSERT INTO hifz_records (r_date,s_name,f_name,t_name,attendance,surah,sq_p,m_p) VALUES (?,?,?,?,?,?,?,?)",
+            (str(sel_date), s, f, st.session_state.username, att, "-", "-", "-")
+        )
         conn.commit()
         st.toast(f"{att} لگ گئی! ✅")
