@@ -60,23 +60,32 @@ init_db()
 st.set_page_config(page_title="جامعہ ملیہ اسلامیہ | Educationist", layout="wide", page_icon="🕌")
 st.markdown("""
 <style>
+    /* فونٹ لوڈ کرنا */
     @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
-    * { font-family: 'Noto Nastaliq Urdu', serif !important; direction: rtl; text-align: right; }
-    
-    /* ڈیش بورڈ کارڈز کی اسٹائلنگ */
-    .dashboard-card { background: linear-gradient(135deg, #ffffff 0%, #f1f8e9 100%); padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); text-align: center; border-bottom: 5px solid #1e5631; margin-bottom: 20px; transition: 0.3s; }
-    .dashboard-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-    .card-title { color: #555; font-size: 18px; font-weight: bold; }
-    .card-value { color: #1e5631; font-size: 38px; font-weight: bold; margin: 10px 0; }
-    
-    /* نوٹس بورڈ اور ہیڈر */
-    .notice-board { background: #fff3cd; padding: 20px; border-radius: 10px; border-right: 6px solid #ffc107; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .main-header { text-align: center; color: white; background: linear-gradient(to right, #1e5631, #2e7d32); padding: 25px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    .date-divider { background-color: #2e7d32; color: white; text-align: center; padding: 10px; font-size: 20px; border-radius: 8px; margin: 25px 0 10px 0; }
-    
-    /* بٹنز */
-    .stButton>button { background: #1e5631; color: white; border-radius: 8px; font-weight: bold; width: 100%; transition: 0.3s; }
-    .stButton>button:hover { background: #2e7d32; color: white; border-color: #1e5631; }
+
+    /* صرف متن (Text) کے لیے اردو فونٹ، آئیکنز کے لیے نہیں */
+    .stApp, p, h1, h2, h3, h4, h5, h6, label, span, div.stMarkdown, button {
+        font-family: 'Noto Nastaliq Urdu', serif !important;
+        direction: rtl;
+        text-align: right;
+    }
+
+    /* آئیکنز کو اپنی اصل حالت میں رکھنے کے لیے مخصوص سیٹنگ */
+    .st-emotion-cache-1vt458s, .material-icons, svg {
+        font-family: inherit !important; /* یہ آئیکنز کو خراب ہونے سے بچائے گا */
+    }
+
+    /* ایکسپینڈر (Expander) کے اندر ناموں کو اوور لیپ ہونے سے بچانے کے لیے */
+    .st-emotion-cache-p5msec {
+        flex-direction: row-reverse !important;
+        text-align: right !important;
+    }
+
+    /* مین پیج کا کنٹینر */
+    .main .block-container {
+        padding-top: 2rem;
+        direction: rtl;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -97,7 +106,7 @@ def execute_delete(table_name, record_id):
     st.rerun()
 
 # ==========================================
-# 3. لاگ ان سسٹم
+# 3. ل ان سسٹم
 # ==========================================
 st.markdown("<div class='main-header'><h1>🕌 جامعہ ملیہ اسلامیہ (Educationist ERP)</h1><p>اسمارٹ تعلیمی و انتظامی پورٹل</p></div>", unsafe_allow_html=True)
 
