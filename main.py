@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
 import sqlite3
-import os
 import pytz
 import plotly.express as px
 import traceback
@@ -41,10 +40,6 @@ def init_db():
             s_name TEXT, f_name TEXT, para_no INTEGER, start_date TEXT, end_date TEXT,
             q1 INTEGER, q2 INTEGER, q3 INTEGER, q4 INTEGER, q5 INTEGER,
             total INTEGER, grade TEXT, status TEXT, exam_type TEXT)""")
-    c.execute('''CREATE TABLE IF NOT EXISTS fees (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            s_name TEXT, f_name TEXT, month_year TEXT, amount INTEGER, paid INTEGER,
-            due_date DATE, payment_date DATE, status TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT, message TEXT, target TEXT, created_at DATETIME, seen INTEGER DEFAULT 0)''')
@@ -66,7 +61,6 @@ def init_db():
         except:
             pass
     
-    # ڈیفالٹ ایڈمن
     c.execute("INSERT OR IGNORE INTO teachers (name, password) VALUES (?,?)", ("admin", "jamia123"))
     conn.commit()
     conn.close()
@@ -92,7 +86,24 @@ def get_pk_time():
 def convert_df_to_csv(df):
     return df.to_csv(index=False).encode('utf-8-sig')
 
+def get_grade_from_mistakes(total_mistakes):
+    """غلطیوں کی تعداد کے مطابق گریڈ"""
+    if total_mistakes <= 2:
+        return "ممتاز"
+    elif total_mistakes <= 5:
+        return "جید جداً"
+    elif total_mistakes <= 8:
+        return "جید"
+    elif total_mistakes <= 12:
+        return "مقبول"
+    else:
+        return "دوبارہ کوشش کریں"
+
 def generate_html_report(df, title, student_name="", start_date="", end_date=""):
+    """HTML رپورٹ جس میں ہیڈنگز اردو میں ہیں"""
+    # ڈیٹا فریم کے کالم نام اردو میں تبدیل کریں (اگر پہلے سے اردو نہ ہوں)
+    # یہاں ہم مفروضہ کالم نام رکھتے ہیں
+    # چونکہ df پہلے سے اردو کالم ناموں کے ساتھ آئے گا، اس لیے تبدیل کی ضرورت نہیں
     html_table = df.to_html(index=False, classes='print-table', border=1, justify='center', escape=False)
     html = f"""
     <!DOCTYPE html>
@@ -127,10 +138,9 @@ def generate_html_report(df, title, student_name="", start_date="", end_date="")
     """
     return html
 
-# -------------------- 3. اسٹائلنگ (موبائل فرینڈلی) --------------------
+# -------------------- 3. اسٹائلنگ (موبائل فرینڈلی اور درست رنگ) --------------------
 st.set_page_config(page_title="جامعہ ملیہ اسلامیہ | سمارٹ ایجوکیشن پورٹل", layout="wide", initial_sidebar_state="expanded")
 
-# زبان ٹوگل
 if 'language' not in st.session_state:
     st.session_state.language = "urdu"
 
@@ -138,13 +148,11 @@ def set_lang(lang):
     st.session_state.language = lang
     st.rerun()
 
-# جدید اسٹائل
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap');
     * {
         font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', Arial, sans-serif;
-        box-sizing: border-box;
     }
     body {
         direction: rtl;
@@ -153,15 +161,18 @@ st.markdown("""
         margin: 0;
         padding: 0;
     }
-    /* سائڈبار */
+    /* سائڈبار - رنگ درست */
     .stSidebar {
         background: linear-gradient(180deg, #1e5631 0%, #0b2b1a 100%);
         color: white;
     }
     .stSidebar .stRadio label {
-        color: white;
+        color: white !important;
         font-weight: bold;
         font-size: 1rem;
+    }
+    .stSidebar .stRadio div {
+        color: white;
     }
     /* بٹن */
     .stButton > button {
@@ -178,7 +189,6 @@ st.markdown("""
     .stButton > button:hover {
         transform: scale(1.02);
         background: linear-gradient(90deg, #2e7d32, #1e5631);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     /* ہیڈر */
     .main-header {
@@ -220,7 +230,7 @@ st.markdown("""
         border-radius: 10px;
         font-weight: bold;
     }
-    /* موبائل کے لیے میڈیا کوئری */
+    /* موبائل */
     @media (max-width: 768px) {
         .stButton > button {
             padding: 0.4rem 0.8rem;
@@ -240,7 +250,6 @@ st.markdown("""
             padding: 0.8rem;
         }
     }
-    /* ڈیٹا فریم */
     .dataframe {
         direction: rtl;
         text-align: right;
@@ -252,7 +261,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# سائڈبار میں زبان کا انتخاب
+# سائڈبار زبان
 st.sidebar.markdown("## 🌐 زبان / Language")
 lang_col1, lang_col2 = st.sidebar.columns(2)
 if lang_col1.button("اردو", use_container_width=True):
@@ -260,7 +269,6 @@ if lang_col1.button("اردو", use_container_width=True):
 if lang_col2.button("English", use_container_width=True):
     set_lang("english")
 
-# متن کی ترجمہ ڈکشنری
 text = {
     "urdu": {
         "title": "جامعہ ملیہ اسلامیہ",
@@ -286,7 +294,6 @@ text = {
 lang = st.session_state.language
 T = text[lang]
 
-# ہیڈر
 st.markdown(f"<div class='main-header'><h1>🕌 {T['title']}</h1><p>{T['subtitle']}</p></div>", unsafe_allow_html=True)
 
 # -------------------- 4. لاگ ان --------------------
@@ -318,19 +325,33 @@ if not st.session_state.logged_in:
 if st.session_state.user_type == "admin":
     menu = [
         "📊 یومیہ تعلیمی رپورٹ", "🎓 امتحانی نظام", "📜 ماہانہ رزلٹ کارڈ",
-        "🕒 اساتذہ حاضری", "🏛️ رخصت کی منظوری", "💰 فیس مینجمنٹ",
-        "👥 یوزر مینجمنٹ", "📢 نوٹیفیکیشنز", "📈 تجزیہ و رپورٹس",
-        "⚙️ بیک اپ & سیٹنگز"
+        "🕒 اساتذہ حاضری", "🏛️ رخصت کی منظوری", "👥 یوزر مینجمنٹ",
+        "📢 نوٹیفیکیشنز", "📈 تجزیہ و رپورٹس", "⚙️ بیک اپ & سیٹنگز"
     ]
 else:
     menu = [
         "📝 تعلیمی اندراج", "🎓 امتحانی درخواست", "📩 رخصت کی درخواست",
-        "🕒 میری حاضری", "💰 میرے طلبہ کی فیس", "📢 نوٹیفیکیشنز"
+        "🕒 میری حاضری", "📢 نوٹیفیکیشنز"
     ]
 
 selected = st.sidebar.radio("📌 مینو", menu)
 
-# -------------------- 6. مختلف سیکشنز (ایڈمن) --------------------
+# -------------------- 6. سورتوں کی فہرست --------------------
+surahs_urdu = [
+    "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
+    "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبياء", "الحج",
+    "المؤمنون", "النور", "الفرقان", "الشعراء", "النمل", "القصص", "العنكبوت", "الروم", "لقمان", "السجدة", "الأحزاب",
+    "سبأ", "فاطر", "يس", "الصافات", "ص", "الزمر", "غافر", "فصلت", "الشورى", "الزخرف", "الدخان", "الجاثية", "الأحقاف",
+    "محمد", "الفتح", "الحجرات", "ق", "الذاريات", "الطور", "النجم", "القمر", "الرحمن", "الواقعة", "الحديد", "المجادلة",
+    "الحشر", "الممتحنة", "الصف", "الجمعة", "المنافقون", "التغابن", "الطلاق", "التحریم", "الملک", "القلم", "الحاقة",
+    "المعارج", "نوح", "الجن", "المزمل", "المدثر", "القیامة", "الإنسان", "المرسلات", "النبأ", "النازعات", "عبس", "التکویر",
+    "الإنفطار", "المطففین", "الإنشقاق", "البروج", "الطارق", "الأعلى", "الغاشیة", "الفجر", "البلد", "الشمس", "اللیل",
+    "الضحى", "الشرح", "التین", "العلق", "القدر", "البینة", "الزلزلة", "العادیات", "القارعة", "التکاثر", "العصر", "الهمزة",
+    "الفیل", "قریش", "الماعون", "الکوثر", "الکافرون", "النصر", "المسد", "الإخلاص", "الفلق", "الناس"
+]
+paras = [f"پارہ {i}" for i in range(1, 31)]
+
+# -------------------- 7. ایڈمن سیکشن --------------------
 if selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
     st.markdown("<h2 style='text-align: center;'>📊 ماسٹر تعلیمی رپورٹ</h2>", unsafe_allow_html=True)
     with st.sidebar:
@@ -342,7 +363,8 @@ if selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.us
         conn.close()
         sel_t = st.selectbox("استاد", t_list)
         sel_s = st.selectbox("طالب علم", s_list)
-    query = "SELECT * FROM hifz_records WHERE r_date BETWEEN ? AND ?"
+    
+    query = "SELECT r_date as تاریخ, s_name as نام, f_name as ولدیت, t_name as استاد, surah as سبق, sq_m as سبقی_غلطی, m_m as منزل_غلطی, attendance as حاضری FROM hifz_records WHERE r_date BETWEEN ? AND ?"
     params = [d1, d2]
     if sel_t != "تمام":
         query += " AND t_name = ?"
@@ -350,6 +372,7 @@ if selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.us
     if sel_s != "تمام":
         query += " AND s_name = ?"
         params.append(sel_s)
+    
     conn = get_db_connection()
     try:
         df = pd.read_sql_query(query, conn, params=params)
@@ -357,32 +380,49 @@ if selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.us
         st.error(f"ڈیٹا لوڈ کرنے میں خرابی: {str(e)}")
         df = pd.DataFrame()
     conn.close()
+    
     if df.empty:
         st.warning("کوئی ریکارڈ نہیں ملا")
     else:
+        # گریڈ شامل کریں
+        df['کل_غلطیاں'] = df['سبقی_غلطی'] + df['منزل_غلطی']
+        df['درجہ'] = df['کل_غلطیاں'].apply(get_grade_from_mistakes)
+        
         # خلاصہ
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("کل ریکارڈ", len(df))
-        col2.metric("حاضر طلباء", len(df[df['attendance'] == 'حاضر']))
-        col3.metric("اوسط سبقی غلطی", round(df['sq_m'].mean(), 1))
-        col4.metric("اوسط منزل غلطی", round(df['m_m'].mean(), 1))
+        col2.metric("حاضر طلباء", len(df[df['حاضری'] == 'حاضر']))
+        avg_mistakes = df['کل_غلطیاں'].mean()
+        col3.metric("اوسط غلطیاں", round(avg_mistakes, 1))
+        col4.metric("مجموعی درجہ", get_grade_from_mistakes(avg_mistakes))
+        
         # تاریخ وار گروپ
-        dates = sorted(df['r_date'].unique())
+        dates = sorted(df['تاریخ'].unique())
         for d in dates:
             with st.expander(f"📆 {d}"):
-                sub = df[df['r_date'] == d]
+                sub = df[df['تاریخ'] == d]
                 edited = st.data_editor(sub, key=f"edit_{d}", use_container_width=True, num_rows="dynamic")
                 if st.button(f"💾 محفوظ کریں ({d})"):
                     conn = get_db_connection()
                     c = conn.cursor()
                     c.execute("DELETE FROM hifz_records WHERE r_date=?", (d,))
-                    edited.to_sql('hifz_records', conn, if_exists='append', index=False)
+                    # یہاں ہمیں اصل کالمز کے مطابق ڈیٹا ڈالنا ہوگا
+                    # چونکہ edited میں صرف منتخب کالم ہیں، ہم اصل ٹیبل میں ڈالنے کے لیے ڈیٹا تیار کریں
+                    for _, row in edited.iterrows():
+                        # اصل hifz_records ٹیبل کے کالم: r_date, s_name, f_name, t_name, surah, sq_m, m_m, attendance
+                        # ہمارے پاس sq_m اور m_m ہیں، sq_a, m_a وغیرہ 0 ڈال سکتے ہیں
+                        c.execute("""INSERT INTO hifz_records 
+                                    (r_date, s_name, f_name, t_name, surah, sq_p, sq_a, sq_m, m_p, m_a, m_m, attendance)
+                                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                  (row['تاریخ'], row['نام'], row['ولدیت'], row['استاد'], row['سبق'], 
+                                   "N/A", 0, row['سبقی_غلطی'], "N/A", 0, row['منزل_غلطی'], row['حاضری']))
                     conn.commit()
                     conn.close()
                     log_audit(st.session_state.username, "Edit Daily Report", f"Date: {d}")
                     st.success("محفوظ ہو گیا")
                     st.rerun()
-        # ڈاؤن لوڈ
+        
+        # ڈاؤن لوڈ اور پرنٹ
         csv = convert_df_to_csv(df)
         st.download_button("📥 CSV ڈاؤن لوڈ", csv, "daily_report.csv")
         if st.button("🖨️ پرنٹ رپورٹ"):
@@ -400,23 +440,37 @@ elif selected == "📜 ماہانہ رزلٹ کارڈ":
         sel_s = st.selectbox("طالب علم", students_list)
         start = st.date_input("تاریخ آغاز", date.today().replace(day=1))
         end = st.date_input("تاریخ اختتام", date.today())
+        
         conn = get_db_connection()
-        query = """SELECT r_date as تاریخ, attendance as حاضری,
-                   surah as 'سبق (آیت تا آیت)',
-                   sq_p as 'سبقی (پارہ)', sq_m as 'سبقی (غلطی)', sq_a as 'سبقی (اٹکن)',
-                   m_p as 'منزل (پارہ)', m_m as 'منزل (غلطی)', m_a as 'منزل (اٹکن)'
-                   FROM hifz_records WHERE s_name=? AND r_date BETWEEN ? AND ?
+        query = """SELECT 
+                    r_date as تاریخ, 
+                    attendance as حاضری,
+                    surah as 'سبق (آیت تا آیت)', 
+                    sq_p as 'سبقی (پارہ)', sq_m as 'سبقی (غلطی)', sq_a as 'سبقی (اٹکن)', 
+                    m_p as 'منزل (پارہ)', m_m as 'منزل (غلطی)', m_a as 'منزل (اٹکن)' 
+                   FROM hifz_records 
+                   WHERE s_name=? AND r_date BETWEEN ? AND ?
                    ORDER BY r_date ASC"""
         try:
             df = pd.read_sql_query(query, conn, params=(sel_s, start, end))
         except Exception as e:
-            st.error(f"ڈیٹا لوڈ کرنے میں خرابی: {str(e)}")
+            st.error(f"خرابی: {str(e)}")
             df = pd.DataFrame()
         conn.close()
+        
         if df.empty:
             st.warning("کوئی ریکارڈ نہیں")
         else:
+            # گریڈ شامل کریں
+            df['کل_غلطیاں'] = df['سبقی (غلطی)'] + df['منزل (غلطی)']
+            df['درجہ'] = df['کل_غلطیاں'].apply(get_grade_from_mistakes)
+            
             st.dataframe(df, use_container_width=True)
+            
+            # خلاصہ
+            avg_mistakes = df['کل_غلطیاں'].mean()
+            st.info(f"**اوسط غلطیاں:** {round(avg_mistakes, 1)} | **مجموعی درجہ:** {get_grade_from_mistakes(avg_mistakes)}")
+            
             html = generate_html_report(df, "ماہانہ رزلٹ کارڈ", student_name=sel_s, start_date=start.strftime("%Y-%m-%d"), end_date=end.strftime("%Y-%m-%d"))
             st.download_button("📥 HTML ڈاؤن لوڈ", html, f"{sel_s}_result.html", "text/html")
             if st.button("🖨️ پرنٹ کریں"):
@@ -468,65 +522,31 @@ elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_
                     st.success("مسترد کر دی گئی")
                     st.rerun()
 
-elif selected == "💰 فیس مینجمن트":
-    st.header("💰 فیس مینجمنٹ")
-    tab1, tab2 = st.tabs(["💰 فیس جمع کریں", "📊 بقایا جات"])
-    with tab1:
-        conn = get_db_connection()
-        students = conn.execute("SELECT name, father_name FROM students").fetchall()
-        conn.close()
-        if not students:
-            st.warning("کوئی طالب علم نہیں")
-        else:
-            s_list = [f"{s[0]} ولد {s[1]}" for s in students]
-            sel = st.selectbox("طالب علم", s_list)
-            s_name, f_name = sel.split(" ولد ")
-            month_year = st.selectbox("ماہ / سال", [f"{m}/{datetime.now().year}" for m in range(1,13)] + [f"{m}/{datetime.now().year-1}" for m in range(1,13)])
-            amount = st.number_input("ماہانہ فیس", min_value=0, value=500)
-            due_date = st.date_input("آخری تاریخ", date.today() + timedelta(days=15))
-            if st.button("🎯 فیس جمع کریں"):
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute("INSERT INTO fees (s_name, f_name, month_year, amount, paid, due_date, status) VALUES (?,?,?,?,?,?,?)",
-                          (s_name, f_name, month_year, amount, 0, due_date, "بقایا"))
-                conn.commit()
-                conn.close()
-                st.success("فیس ریکارڈ شامل کر دی گئی")
-                log_audit(st.session_state.username, "Fee Added", f"{s_name} - {month_year}")
-    with tab2:
-        conn = get_db_connection()
-        try:
-            df = pd.read_sql_query("SELECT s_name as نام, f_name as ولدیت, month_year as ماہ, amount as رقم, paid as ادا, due_date as آخری_تاریخ, status as حالت FROM fees", conn)
-        except Exception as e:
-            st.error(f"خرابی: {str(e)}")
-            df = pd.DataFrame()
-        conn.close()
-        if not df.empty:
-            st.dataframe(df, use_container_width=True)
-            st.download_button("بقایا جات کی رپورٹ ڈاؤن لوڈ کریں", convert_df_to_csv(df), "fees_report.csv")
-        else:
-            st.info("کوئی فیس ریکارڈ نہیں")
-
 elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type == "admin":
     st.header("👥 اساتذہ و طلبہ مینجمنٹ")
     t1, t2 = st.tabs(["اساتذہ", "طلبہ"])
     with t1:
         conn = get_db_connection()
-        teachers = pd.read_sql_query("SELECT id, name, password, phone, address, id_card FROM teachers", conn)
+        try:
+            teachers = pd.read_sql_query("SELECT id, name, password, phone, address, id_card FROM teachers", conn)
+        except Exception as e:
+            st.error(f"خرابی: {str(e)}")
+            teachers = pd.DataFrame()
         conn.close()
-        edited = st.data_editor(teachers, num_rows="dynamic", use_container_width=True, key="teachers_edit")
-        if st.button("اساتذہ کی تبدیلیاں محفوظ کریں"):
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("DELETE FROM teachers")
-            for _, row in edited.iterrows():
-                c.execute("INSERT INTO teachers (id, name, password, phone, address, id_card) VALUES (?,?,?,?,?,?)",
-                          (row['id'], row['name'], row['password'], row['phone'], row['address'], row['id_card']))
-            conn.commit()
-            conn.close()
-            log_audit(st.session_state.username, "Teachers Updated")
-            st.success("محفوظ ہو گیا")
-            st.rerun()
+        if not teachers.empty:
+            edited = st.data_editor(teachers, num_rows="dynamic", use_container_width=True, key="teachers_edit")
+            if st.button("اساتذہ کی تبدیلیاں محفوظ کریں"):
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("DELETE FROM teachers")
+                for _, row in edited.iterrows():
+                    c.execute("INSERT INTO teachers (id, name, password, phone, address, id_card) VALUES (?,?,?,?,?,?)",
+                              (row['id'], row['name'], row['password'], row['phone'], row['address'], row['id_card']))
+                conn.commit()
+                conn.close()
+                log_audit(st.session_state.username, "Teachers Updated")
+                st.success("محفوظ ہو گیا")
+                st.rerun()
         with st.expander("نیا استاد شامل کریں"):
             with st.form("new_teacher"):
                 name = st.text_input("نام")
@@ -547,20 +567,25 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                         st.rerun()
     with t2:
         conn = get_db_connection()
-        students = pd.read_sql_query("SELECT id, name, father_name, mother_name, teacher_name, phone, address, id_card, admission_date, class, section FROM students", conn)
+        try:
+            students = pd.read_sql_query("SELECT id, name, father_name, mother_name, teacher_name, phone, address, id_card, admission_date, class, section FROM students", conn)
+        except Exception as e:
+            st.error(f"خرابی: {str(e)}")
+            students = pd.DataFrame()
         conn.close()
-        edited = st.data_editor(students, num_rows="dynamic", use_container_width=True, key="students_edit")
-        if st.button("طلبہ کی تبدیلیاں محفوظ کریں"):
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("DELETE FROM students")
-            for _, row in edited.iterrows():
-                c.execute("INSERT INTO students (id, name, father_name, mother_name, teacher_name, phone, address, id_card, admission_date, class, section) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                          (row['id'], row['name'], row['father_name'], row['mother_name'], row['teacher_name'], row['phone'], row['address'], row['id_card'], row['admission_date'], row['class'], row['section']))
-            conn.commit()
-            conn.close()
-            st.success("محفوظ ہو گیا")
-            st.rerun()
+        if not students.empty:
+            edited = st.data_editor(students, num_rows="dynamic", use_container_width=True, key="students_edit")
+            if st.button("طلبہ کی تبدیلیاں محفوظ کریں"):
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("DELETE FROM students")
+                for _, row in edited.iterrows():
+                    c.execute("INSERT INTO students (id, name, father_name, mother_name, teacher_name, phone, address, id_card, admission_date, class, section) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                              (row['id'], row['name'], row['father_name'], row['mother_name'], row['teacher_name'], row['phone'], row['address'], row['id_card'], row['admission_date'], row['class'], row['section']))
+                conn.commit()
+                conn.close()
+                st.success("محفوظ ہو گیا")
+                st.rerun()
         with st.expander("نیا طالب علم شامل کریں"):
             with st.form("new_student"):
                 s_name = st.text_input("نام")
@@ -604,7 +629,6 @@ elif selected == "📢 نوٹیفیکیشنز":
                 conn.commit()
                 conn.close()
                 st.success("بھیج دیا گیا")
-    # دکھائیں
     conn = get_db_connection()
     if st.session_state.user_type == "admin":
         notifs = conn.execute("SELECT title, message, created_at FROM notifications ORDER BY created_at DESC LIMIT 10").fetchall()
@@ -623,14 +647,16 @@ elif selected == "📈 تجزیہ و رپورٹس" and st.session_state.user_typ
         st.plotly_chart(fig, use_container_width=True)
     rec_df = pd.read_sql_query("SELECT s_name as نام, sq_m as سبقی_غلطی, m_m as منزل_غلطی FROM hifz_records", conn)
     if not rec_df.empty:
-        fig2 = px.scatter(rec_df, x='سبقی_غلطی', y='منزل_غلطی', color='نام', title='غلطیوں کا تجزیہ')
+        rec_df['کل_غلطیاں'] = rec_df['سبقی_غلطی'] + rec_df['منزل_غلطی']
+        rec_df['درجہ'] = rec_df['کل_غلطیاں'].apply(get_grade_from_mistakes)
+        fig2 = px.scatter(rec_df, x='سبقی_غلطی', y='منزل_غلطی', color='درجہ', title='غلطیوں کا تجزیہ')
         st.plotly_chart(fig2, use_container_width=True)
     conn.close()
 
 elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_type == "admin":
     st.header("⚙️ بیک اپ اور سیٹنگز")
     if st.button("💾 ڈیٹا بیس کا بیک اپ (CSV)"):
-        tables = ["teachers", "students", "hifz_records", "t_attendance", "leave_requests", "exams", "fees", "notifications", "audit_log"]
+        tables = ["teachers", "students", "hifz_records", "t_attendance", "leave_requests", "exams", "notifications", "audit_log"]
         conn = get_db_connection()
         for t in tables:
             try:
@@ -646,7 +672,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         conn.close()
         st.dataframe(logs, use_container_width=True)
 
-# -------------------- 7. استاد کے سیکشن --------------------
+# -------------------- 8. استاد کے سیکشن --------------------
 elif selected == "📝 تعلیمی اندراج" and st.session_state.user_type == "teacher":
     st.header("🚀 تعلیمی اندراج")
     sel_date = st.date_input("تاریخ", date.today())
@@ -662,47 +688,94 @@ elif selected == "📝 تعلیمی اندراج" and st.session_state.user_type
                 st.markdown(f"### 👤 {s} ولد {f}")
                 att = st.radio("حاضری", ["حاضر", "غیر حاضر"], key=f"att_{s}", horizontal=True)
                 if att == "حاضر":
-                    surah = st.selectbox("سورت", ["الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس", "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبياء", "الحج", "المؤمنون", "النور", "الفرقان", "الشعراء", "النمل", "القصص", "العنكبوت", "الروم", "لقمان", "السجدة", "الأحزاب", "سبأ", "فاطر", "يس", "الصافات", "ص", "الزمر", "غافر", "فصلت", "الشورى", "الزخرف", "الدخان", "الجاثية", "الأحقاف", "محمد", "الفتح", "الحجرات", "ق", "الذاريات", "الطور", "النجم", "القمر", "الرحمن", "الواقعة", "الحديد", "المجادلة", "الحشر", "الممتحنة", "الصف", "الجمعة", "المنافقون", "التغابن", "الطلاق", "التحریم", "الملک", "القلم", "الحاقة", "المعارج", "نوح", "الجن", "المزمل", "المدثر", "القیامة", "الإنسان", "المرسلات", "النبأ", "النازعات", "عبس", "التکویر", "الإنفطار", "المطففین", "الإنشقاق", "البروج", "الطارق", "الأعلى", "الغاشیة", "الفجر", "البلد", "الشمس", "اللیل", "الضحى", "الشرح", "التین", "العلق", "القدر", "البینة", "الزلزلة", "العادیات", "القارعة", "التکاثر", "العصر", "الهمزة", "الفیل", "قریش", "الماعون", "الکوثر", "الکافرون", "النصر", "المسد", "الإخلاص", "الفلق", "الناس"], key=f"surah_{s}")
+                    # سبق
+                    surah = st.selectbox("سورت", surahs_urdu, key=f"surah_{s}")
                     a_from = st.text_input("آیت (سے)", key=f"af_{s}")
                     a_to = st.text_input("آیت (تک)", key=f"at_{s}")
                     sabq = f"{surah}: {a_from}-{a_to}"
                     
-                    # سبقی
-                    sq_count = st.number_input("سبقی پاروں کی تعداد", 1, 5, 1, key=f"sqc_{s}")
-                    sq_parts = []
-                    sq_a = sq_m = 0
-                    for i in range(sq_count):
-                        cols = st.columns([2,2,1,1])
-                        p = cols[0].selectbox("پارہ", [f"پارہ {j}" for j in range(1,31)], key=f"sqp_{s}_{i}")
-                        v = cols[1].selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"sqv_{s}_{i}")
-                        a = cols[2].number_input("اٹکن", 0, key=f"sqa_{s}_{i}")
-                        e = cols[3].number_input("غلطی", 0, key=f"sqe_{s}_{i}")
-                        sq_parts.append(f"{p}:{v}")
-                        sq_a += a
-                        sq_m += e
+                    # سبقی - متعدد پاروں کے لیے بٹن کے ذریعے
+                    st.write("**سبقی**")
+                    if f"sq_parts_{s}" not in st.session_state:
+                        st.session_state[f"sq_parts_{s}"] = []
+                    if f"sq_mistakes_{s}" not in st.session_state:
+                        st.session_state[f"sq_mistakes_{s}"] = []
+                    if f"sq_atkan_{s}" not in st.session_state:
+                        st.session_state[f"sq_atkan_{s}"] = []
                     
-                    # منزل
-                    m_count = st.number_input("منزل پاروں کی تعداد", 1, 5, 1, key=f"mc_{s}")
-                    m_parts = []
-                    m_a = m_m = 0
-                    for j in range(m_count):
-                        cols = st.columns([2,2,1,1])
-                        p = cols[0].selectbox("پارہ", [f"پارہ {j}" for j in range(1,31)], key=f"mp_{s}_{j}")
-                        v = cols[1].selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"mv_{s}_{j}")
-                        a = cols[2].number_input("اٹکن", 0, key=f"ma_{s}_{j}")
-                        e = cols[3].number_input("غلطی", 0, key=f"me_{s}_{j}")
-                        m_parts.append(f"{p}:{v}")
-                        m_a += a
-                        m_m += e
+                    # موجودہ پاروں کو دکھائیں
+                    for idx, (para, val, atk, mis) in enumerate(zip(st.session_state[f"sq_parts_{s}"],
+                                                                   st.session_state.get(f"sq_values_{s}", []),
+                                                                   st.session_state.get(f"sq_atkan_{s}", []),
+                                                                   st.session_state.get(f"sq_mistakes_{s}", []))):
+                        st.write(f"{idx+1}. {para} - مقدار: {val} | اٹکن: {atk} | غلطی: {mis}")
+                    
+                    # نیا پارہ شامل کرنے کا بٹن
+                    col1, col2, col3, col4 = st.columns(4)
+                    new_para = col1.selectbox("پارہ", paras, key=f"new_para_{s}")
+                    new_val = col2.selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"new_val_{s}")
+                    new_atk = col3.number_input("اٹکن", 0, key=f"new_atk_{s}")
+                    new_mis = col4.number_input("غلطی", 0, key=f"new_mis_{s}")
+                    if st.button(f"➕ مزید سبقی پارہ ({s})", key=f"add_sq_{s}"):
+                        st.session_state[f"sq_parts_{s}"].append(new_para)
+                        if f"sq_values_{s}" not in st.session_state:
+                            st.session_state[f"sq_values_{s}"] = []
+                        st.session_state[f"sq_values_{s}"].append(new_val)
+                        if f"sq_atkan_{s}" not in st.session_state:
+                            st.session_state[f"sq_atkan_{s}"] = []
+                        st.session_state[f"sq_atkan_{s}"].append(new_atk)
+                        if f"sq_mistakes_{s}" not in st.session_state:
+                            st.session_state[f"sq_mistakes_{s}"] = []
+                        st.session_state[f"sq_mistakes_{s}"].append(new_mis)
+                        st.rerun()
+                    
+                    # منزل - اسی طرح
+                    st.write("**منزل**")
+                    if f"m_parts_{s}" not in st.session_state:
+                        st.session_state[f"m_parts_{s}"] = []
+                    if f"m_values_{s}" not in st.session_state:
+                        st.session_state[f"m_values_{s}"] = []
+                    if f"m_atkan_{s}" not in st.session_state:
+                        st.session_state[f"m_atkan_{s}"] = []
+                    if f"m_mistakes_{s}" not in st.session_state:
+                        st.session_state[f"m_mistakes_{s}"] = []
+                    
+                    for idx, (para, val, atk, mis) in enumerate(zip(st.session_state[f"m_parts_{s}"],
+                                                                   st.session_state.get(f"m_values_{s}", []),
+                                                                   st.session_state.get(f"m_atkan_{s}", []),
+                                                                   st.session_state.get(f"m_mistakes_{s}", []))):
+                        st.write(f"{idx+1}. {para} - مقدار: {val} | اٹکن: {atk} | غلطی: {mis}")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    new_para_m = col1.selectbox("پارہ", paras, key=f"new_para_m_{s}")
+                    new_val_m = col2.selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"new_val_m_{s}")
+                    new_atk_m = col3.number_input("اٹکن", 0, key=f"new_atk_m_{s}")
+                    new_mis_m = col4.number_input("غلطی", 0, key=f"new_mis_m_{s}")
+                    if st.button(f"➕ مزید منزل پارہ ({s})", key=f"add_m_{s}"):
+                        st.session_state[f"m_parts_{s}"].append(new_para_m)
+                        st.session_state[f"m_values_{s}"].append(new_val_m)
+                        st.session_state[f"m_atkan_{s}"].append(new_atk_m)
+                        st.session_state[f"m_mistakes_{s}"].append(new_mis_m)
+                        st.rerun()
+                    
+                    # ڈیٹا تیار کریں
+                    sq_parts_str = " | ".join([f"{p}:{v}" for p, v in zip(st.session_state[f"sq_parts_{s}"], st.session_state.get(f"sq_values_{s}", []))])
+                    sq_a_total = sum(st.session_state.get(f"sq_atkan_{s}", []))
+                    sq_m_total = sum(st.session_state.get(f"sq_mistakes_{s}", []))
+                    m_parts_str = " | ".join([f"{p}:{v}" for p, v in zip(st.session_state[f"m_parts_{s}"], st.session_state.get(f"m_values_{s}", []))])
+                    m_a_total = sum(st.session_state.get(f"m_atkan_{s}", []))
+                    m_m_total = sum(st.session_state.get(f"m_mistakes_{s}", []))
                 else:
                     sabq = "ناغہ"
-                    sq_parts = ["ناغہ"]
-                    sq_a = sq_m = 0
-                    m_parts = ["ناغہ"]
-                    m_a = m_m = 0
+                    sq_parts_str = "ناغہ"
+                    sq_a_total = sq_m_total = 0
+                    m_parts_str = "ناغہ"
+                    m_a_total = m_m_total = 0
+                
                 records.append((sel_date, s, f, st.session_state.username, sabq,
-                                " | ".join(sq_parts), sq_a, sq_m,
-                                " | ".join(m_parts), m_a, m_m, att))
+                                sq_parts_str, sq_a_total, sq_m_total,
+                                m_parts_str, m_a_total, m_m_total, att))
+            
             submitted = st.form_submit_button("محفوظ کریں")
             if submitted:
                 conn = get_db_connection()
@@ -721,6 +794,12 @@ elif selected == "📝 تعلیمی اندراج" and st.session_state.user_type
                                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", rec)
                     conn.commit()
                     log_audit(st.session_state.username, "Daily Entry", f"Date: {sel_date}")
+                    # سیشن صاف کریں
+                    for s, f in students:
+                        for key in [f"sq_parts_{s}", f"sq_values_{s}", f"sq_atkan_{s}", f"sq_mistakes_{s}",
+                                    f"m_parts_{s}", f"m_values_{s}", f"m_atkan_{s}", f"m_mistakes_{s}"]:
+                            if key in st.session_state:
+                                del st.session_state[key]
                     st.success("محفوظ ہو گیا")
                     st.rerun()
                 conn.close()
@@ -806,26 +885,6 @@ elif selected == "🕒 میری حاضری" and st.session_state.user_type == "t
     else:
         st.success(f"آمد: {rec[0]} | رخصت: {rec[1]}")
 
-elif selected == "💰 میرے طلبہ کی فیس" and st.session_state.user_type == "teacher":
-    st.header("💰 میرے طلبہ کی فیس")
-    conn = get_db_connection()
-    students = conn.execute("SELECT name, father_name FROM students WHERE teacher_name=?", (st.session_state.username,)).fetchall()
-    conn.close()
-    if not students:
-        st.info("کوئی طالب علم نہیں")
-    else:
-        for s, f in students:
-            with st.expander(f"{s} ولد {f}"):
-                conn = get_db_connection()
-                fees = conn.execute("SELECT month_year, amount, paid, status FROM fees WHERE s_name=? AND f_name=?", (s, f)).fetchall()
-                conn.close()
-                if fees:
-                    df = pd.DataFrame(fees, columns=["ماہ", "رقم", "ادا", "حالت"])
-                    st.dataframe(df, use_container_width=True)
-                else:
-                    st.write("کوئی فیس ریکارڈ نہیں")
-
-# -------------------- 8. امتحانی نظام (ایڈمن) --------------------
 elif selected == "🎓 امتحانی نظام" and st.session_state.user_type == "admin":
     st.header("🎓 امتحانی نظام")
     tab1, tab2 = st.tabs(["پینڈنگ امتحانات", "مکمل شدہ"])
@@ -864,8 +923,11 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
         conn = get_db_connection()
         hist = pd.read_sql_query("SELECT s_name, f_name, para_no, total, grade, status FROM exams WHERE status!='پینڈنگ'", conn)
         conn.close()
-        st.dataframe(hist, use_container_width=True)
-        st.download_button("ہسٹری ڈاؤن لوڈ", convert_df_to_csv(hist), "exam_history.csv")
+        if not hist.empty:
+            st.dataframe(hist, use_container_width=True)
+            st.download_button("ہسٹری ڈاؤن لوڈ", convert_df_to_csv(hist), "exam_history.csv")
+        else:
+            st.info("کوئی مکمل شدہ امتحان نہیں")
 
 # -------------------- 9. لاگ آؤٹ --------------------
 st.sidebar.divider()
