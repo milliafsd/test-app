@@ -6,7 +6,7 @@ import pytz
 import plotly.express as px
 
 # -------------------- 1. ڈیٹا بیس سیٹ اپ --------------------
-DB_NAME = 'jamia_erp_v3.db'
+DB_NAME = 'jamia_millia_v1 (1) (1).db'
 
 def get_db_connection():
     return sqlite3.connect(DB_NAME, check_same_thread=False)
