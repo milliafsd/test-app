@@ -5,11 +5,9 @@ import sqlite3
 import pytz
 import plotly.express as px
 import os
-from PIL import Image
-import base64
 
-# -------------------- 1. ڈیٹا بیس سیٹ اپ --------------------
-DB_NAME = 'jamia_millia_v1 (1) (1).db'
+# -------------------- 1. ڈیٹا بیس سیٹ اپ (مکمل اور محفوظ) --------------------
+DB_NAME = 'jamia_erp_final.db'
 
 def get_db_connection():
     return sqlite3.connect(DB_NAME, check_same_thread=False)
@@ -18,76 +16,160 @@ def init_db():
     conn = get_db_connection()
     c = conn.cursor()
     
-    # اساتذہ (مکمل)
-    c.execute('''CREATE TABLE IF NOT EXISTS teachers 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, password TEXT, 
-                  dept TEXT, phone TEXT, address TEXT, id_card TEXT, photo TEXT, joining_date DATE)''')
-    # طلبہ (مکمل)
-    c.execute('''CREATE TABLE IF NOT EXISTS students 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  name TEXT, father_name TEXT, mother_name TEXT, 
-                  dob DATE, admission_date DATE, exit_date DATE, exit_reason TEXT,
-                  id_card TEXT, photo TEXT, phone TEXT, address TEXT,
-                  teacher_name TEXT, dept TEXT, class TEXT, section TEXT)''')
+    # اساتذہ ٹیبل
+    c.execute('''CREATE TABLE IF NOT EXISTS teachers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        password TEXT,
+        dept TEXT,
+        phone TEXT,
+        address TEXT,
+        id_card TEXT,
+        photo TEXT,
+        joining_date DATE
+    )''')
+    
+    # طلبہ ٹیبل (تمام مطلوبہ کالمز کے ساتھ)
+    c.execute('''CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        father_name TEXT,
+        mother_name TEXT,
+        dob DATE,
+        admission_date DATE,
+        exit_date DATE,
+        exit_reason TEXT,
+        id_card TEXT,
+        photo TEXT,
+        phone TEXT,
+        address TEXT,
+        teacher_name TEXT,
+        dept TEXT,
+        class TEXT,
+        section TEXT
+    )''')
+    
     # حفظ ریکارڈ
-    c.execute('''CREATE TABLE IF NOT EXISTS hifz_records 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, r_date DATE, s_name TEXT, f_name TEXT, t_name TEXT, 
-                  surah TEXT, a_from TEXT, a_to TEXT, 
-                  sq_p TEXT, sq_a INTEGER, sq_m INTEGER, 
-                  m_p TEXT, m_a INTEGER, m_m INTEGER, 
-                  attendance TEXT, principal_note TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS hifz_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        r_date DATE,
+        s_name TEXT,
+        f_name TEXT,
+        t_name TEXT,
+        surah TEXT,
+        a_from TEXT,
+        a_to TEXT,
+        sq_p TEXT,
+        sq_a INTEGER,
+        sq_m INTEGER,
+        m_p TEXT,
+        m_a INTEGER,
+        m_m INTEGER,
+        attendance TEXT,
+        principal_note TEXT
+    )''')
+    
     # عمومی تعلیم (درسِ نظامی اور عصری)
-    c.execute('''CREATE TABLE IF NOT EXISTS general_education 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, r_date DATE, s_name TEXT, f_name TEXT, t_name TEXT,
-                  dept TEXT, book_subject TEXT, today_lesson TEXT, homework TEXT, performance TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS general_education (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        r_date DATE,
+        s_name TEXT,
+        f_name TEXT,
+        t_name TEXT,
+        dept TEXT,
+        book_subject TEXT,
+        today_lesson TEXT,
+        homework TEXT,
+        performance TEXT
+    )''')
+    
     # اساتذہ حاضری
-    c.execute('''CREATE TABLE IF NOT EXISTS t_attendance 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, t_name TEXT, a_date DATE, arrival TEXT, departure TEXT, 
-                  actual_arrival TEXT, actual_departure TEXT)''')
-    # رخصت درخواستیں
-    c.execute('''CREATE TABLE IF NOT EXISTS leave_requests 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, t_name TEXT, reason TEXT, start_date DATE, 
-                  back_date DATE, status TEXT, request_date DATE, l_type TEXT, days INTEGER, 
-                  notification_seen INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS t_attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        t_name TEXT,
+        a_date DATE,
+        arrival TEXT,
+        departure TEXT,
+        actual_arrival TEXT,
+        actual_departure TEXT
+    )''')
+    
+    # رخصت درخواستیں (تمام کالمز)
+    c.execute('''CREATE TABLE IF NOT EXISTS leave_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        t_name TEXT,
+        reason TEXT,
+        start_date DATE,
+        back_date DATE,
+        status TEXT,
+        request_date DATE,
+        l_type TEXT,
+        days INTEGER,
+        notification_seen INTEGER DEFAULT 0
+    )''')
+    
     # امتحانات
-    c.execute("""CREATE TABLE IF NOT EXISTS exams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            s_name TEXT, f_name TEXT, dept TEXT, para_no INTEGER, start_date TEXT, end_date TEXT,
-            q1 INTEGER, q2 INTEGER, q3 INTEGER, q4 INTEGER, q5 INTEGER,
-            total INTEGER, grade TEXT, status TEXT, exam_type TEXT)""")
+    c.execute('''CREATE TABLE IF NOT EXISTS exams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        s_name TEXT,
+        f_name TEXT,
+        dept TEXT,
+        para_no INTEGER,
+        start_date TEXT,
+        end_date TEXT,
+        q1 INTEGER,
+        q2 INTEGER,
+        q3 INTEGER,
+        q4 INTEGER,
+        q5 INTEGER,
+        total INTEGER,
+        grade TEXT,
+        status TEXT,
+        exam_type TEXT
+    )''')
+    
     # پاس شدہ پارے
-    c.execute("""CREATE TABLE IF NOT EXISTS passed_paras (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            s_name TEXT, f_name TEXT, para_no INTEGER, passed_date DATE, exam_type TEXT)""")
+    c.execute('''CREATE TABLE IF NOT EXISTS passed_paras (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        s_name TEXT,
+        f_name TEXT,
+        para_no INTEGER,
+        passed_date DATE,
+        exam_type TEXT
+    )''')
+    
     # ٹائم ٹیبل
-    c.execute('''CREATE TABLE IF NOT EXISTS timetable 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, t_name TEXT, day TEXT, period TEXT, book TEXT, room TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS timetable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        t_name TEXT,
+        day TEXT,
+        period TEXT,
+        book TEXT,
+        room TEXT
+    )''')
+    
     # نوٹیفیکیشنز
-    c.execute('''CREATE TABLE IF NOT EXISTS notifications 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, message TEXT, target TEXT, created_at DATETIME, seen INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        message TEXT,
+        target TEXT,
+        created_at DATETIME,
+        seen INTEGER DEFAULT 0
+    )''')
+    
     # آڈٹ لاگ
-    c.execute('''CREATE TABLE IF NOT EXISTS audit_log 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, action TEXT, timestamp DATETIME, details TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user TEXT,
+        action TEXT,
+        timestamp DATETIME,
+        details TEXT
+    )''')
+    
     conn.commit()
     
-    # نئے کالمز کا اضافہ (اگر پہلے سے نہ ہوں)
-    cols = [
-        ("teachers", "dept", "TEXT"), ("teachers", "phone", "TEXT"), ("teachers", "address", "TEXT"), 
-        ("teachers", "id_card", "TEXT"), ("teachers", "photo", "TEXT"), ("teachers", "joining_date", "DATE"),
-        ("students", "mother_name", "TEXT"), ("students", "dob", "DATE"), ("students", "exit_date", "DATE"),
-        ("students", "exit_reason", "TEXT"), ("students", "id_card", "TEXT"), ("students", "photo", "TEXT"),
-        ("students", "phone", "TEXT"), ("students", "address", "TEXT"), ("students", "dept", "TEXT"),
-        ("students", "class", "TEXT"), ("students", "section", "TEXT"),
-        ("exams", "dept", "TEXT"),
-        ("t_attendance", "actual_arrival", "TEXT"), ("t_attendance", "actual_departure", "TEXT")
-    ]
-    for t, col, typ in cols:
-        try:
-            c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {typ}")
-        except:
-            pass
-    
-    # ڈیفالٹ ایڈمن
+    # ڈیفالٹ ایڈمن صارف
     c.execute("INSERT OR IGNORE INTO teachers (name, password, dept) VALUES (?,?,?)", ("admin", "jamia123", "Admin"))
     conn.commit()
     conn.close()
@@ -114,11 +196,16 @@ def convert_df_to_csv(df):
     return df.to_csv(index=False).encode('utf-8-sig')
 
 def get_grade_from_mistakes(total_mistakes):
-    if total_mistakes <= 2: return "ممتاز"
-    elif total_mistakes <= 5: return "جید جداً"
-    elif total_mistakes <= 8: return "جید"
-    elif total_mistakes <= 12: return "مقبول"
-    else: return "دوبارہ کوشش کریں"
+    if total_mistakes <= 2:
+        return "ممتاز"
+    elif total_mistakes <= 5:
+        return "جید جداً"
+    elif total_mistakes <= 8:
+        return "جید"
+    elif total_mistakes <= 12:
+        return "مقبول"
+    else:
+        return "دوبارہ کوشش کریں"
 
 def generate_html_report(df, title, student_name="", start_date="", end_date="", passed_paras=None):
     html_table = df.to_html(index=False, classes='print-table', border=1, justify='center', escape=False)
@@ -416,9 +503,13 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
     with tab2:
         st.subheader("موجودہ طلبہ")
         conn = get_db_connection()
-        students_df = pd.read_sql_query("""SELECT id, name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
-                                          id_card, phone, address, teacher_name, dept, class, section
-                                          FROM students""", conn)
+        try:
+            students_df = pd.read_sql_query("""SELECT id, name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
+                                              id_card, phone, address, teacher_name, dept, class, section
+                                              FROM students""", conn)
+        except Exception as e:
+            st.error(f"ڈیٹا لوڈ کرنے میں خرابی: {str(e)}")
+            students_df = pd.DataFrame()
         conn.close()
         if not students_df.empty:
             edited_students = st.data_editor(students_df, num_rows="dynamic", use_container_width=True, key="students_edit")
@@ -455,7 +546,6 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                     dept = st.selectbox("شعبہ*", ["حفظ", "درسِ نظامی", "عصری تعلیم"])
                     class_name = st.text_input("کلاس (عصری تعلیم کے لیے)")
                     section = st.text_input("سیکشن")
-                    # اساتذہ کی فہرست
                     conn = get_db_connection()
                     teachers_list = [t[0] for t in conn.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
                     conn.close()
@@ -500,7 +590,7 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                     else:
                         st.error("نام، ولدیت، استاد اور شعبہ ضروری ہیں")
 
-# ================= باقی ایڈمن سیکشنز (پہلے والے) =================
+# ================= باقی ایڈمن سیکشنز =================
 elif selected == "🕒 اساتذہ حاضری" and st.session_state.user_type == "admin":
     st.header("اساتذہ حاضری ریکارڈ")
     conn = get_db_connection()
@@ -511,7 +601,12 @@ elif selected == "🕒 اساتذہ حاضری" and st.session_state.user_type =
 elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_type == "admin":
     st.header("رخصت کی منظوری")
     conn = get_db_connection()
-    pending = conn.execute("SELECT id, t_name, l_type, reason, start_date, days FROM leave_requests WHERE status LIKE ?", ('%پینڈنگ%',)).fetchall()
+    try:
+        # تصدیق کریں کہ ٹیبل میں مطلوبہ کالمز موجود ہیں
+        pending = conn.execute("SELECT id, t_name, l_type, reason, start_date, days FROM leave_requests WHERE status LIKE ?", ('%پینڈنگ%',)).fetchall()
+    except Exception as e:
+        st.error(f"ڈیٹا بیس میں خرابی: {str(e)}۔ براہ کرم ایڈمن سے رابطہ کریں۔")
+        pending = []
     conn.close()
     if not pending:
         st.info("کوئی پینڈنگ درخواست نہیں")
@@ -612,7 +707,6 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         st.dataframe(logs)
 
 # ================= استاد کے سیکشن =================
-# 1. روزانہ سبق اندراج (پہلے والا مکمل)
 elif selected == "📝 روزانہ سبق اندراج" and st.session_state.user_type == "teacher":
     st.header("📝 روزانہ سبق اندراج")
     dept = st.selectbox("شعبہ منتخب کریں", ["حفظ", "درسِ نظامی", "عصری تعلیم"])
@@ -754,7 +848,6 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                     conn.close()
                     st.success("محفوظ ہو گیا")
 
-# 2. امتحانی درخواست (استاد)
 elif selected == "🎓 امتحانی درخواست" and st.session_state.user_type == "teacher":
     st.subheader("امتحان کے لیے طالب علم نامزد کریں")
     conn = get_db_connection()
@@ -783,7 +876,6 @@ elif selected == "🎓 امتحانی درخواست" and st.session_state.user_
                 conn.close()
                 st.success("درخواست بھیج دی گئی")
 
-# 3. رخصت کی درخواست (استاد)
 elif selected == "📩 رخصت کی درخواست" and st.session_state.user_type == "teacher":
     st.header("📩 رخصت کی درخواست")
     with st.form("leave_request_form"):
@@ -808,7 +900,6 @@ elif selected == "📩 رخصت کی درخواست" and st.session_state.user_t
             else:
                 st.error("براہ کرم وجہ تحریر کریں")
 
-# 4. میری حاضری (استاد)
 elif selected == "🕒 میری حاضری" and st.session_state.user_type == "teacher":
     st.header("🕒 میری حاضری")
     today = date.today()
@@ -843,7 +934,6 @@ elif selected == "🕒 میری حاضری" and st.session_state.user_type == "t
     else:
         st.success(f"آمد: {rec[0]} | رخصت: {rec[1]}")
 
-# 5. میرا ٹائم ٹیبل (استاد)
 elif selected == "📚 میرا ٹائم ٹیبل" and st.session_state.user_type == "teacher":
     st.header("میرا ٹائم ٹیبل")
     conn = get_db_connection()
@@ -853,15 +943,6 @@ elif selected == "📚 میرا ٹائم ٹیبل" and st.session_state.user_typ
         st.info("ابھی آپ کا ٹائم ٹیبل ترتیب نہیں دیا گیا")
     else:
         st.table(df)
-
-# 6. نوٹیفیکیشنز (استاد)
-elif selected == "📢 نوٹیفیکیشنز" and st.session_state.user_type == "teacher":
-    st.header("نوٹیفیکیشنز")
-    conn = get_db_connection()
-    notifs = conn.execute("SELECT title, message, created_at FROM notifications WHERE target IN ('تمام','اساتذہ') ORDER BY created_at DESC LIMIT 10").fetchall()
-    conn.close()
-    for n in notifs:
-        st.info(f"**{n[0]}**\n\n{n[1]}\n\n*{n[2]}*")
 
 # ================= لاگ آؤٹ =================
 st.sidebar.divider()
