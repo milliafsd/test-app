@@ -6,8 +6,8 @@ import pytz
 import plotly.express as px
 import os
 
-# -------------------- 1. ڈیٹا بیس سیٹ اپ (مکمل اور محفوظ) --------------------
-DB_NAME = 'jamia_millia_v1 (1) (1).db'
+# ==================== ڈیٹا بیس کا نام ====================
+DB_NAME = 'jamia_millia_v1 (1) (1).db'  # آپ کی فائل کا نام یہاں لکھیں
 
 def get_db_connection():
     return sqlite3.connect(DB_NAME, check_same_thread=False)
@@ -16,40 +16,56 @@ def init_db():
     conn = get_db_connection()
     c = conn.cursor()
     
-    # اساتذہ ٹیبل
+    # ========== 1. اساتذہ ٹیبل (مکمل) ==========
+    # پہلے ٹیبل بنائیں اگر نہ ہو
     c.execute('''CREATE TABLE IF NOT EXISTS teachers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE,
-        password TEXT,
-        dept TEXT,
-        phone TEXT,
-        address TEXT,
-        id_card TEXT,
-        photo TEXT,
-        joining_date DATE
+        password TEXT
     )''')
+    # اب ضروری کالمز شامل کریں اگر نہ ہوں
+    columns_to_add_teachers = [
+        ("dept", "TEXT"),
+        ("phone", "TEXT"),
+        ("address", "TEXT"),
+        ("id_card", "TEXT"),
+        ("photo", "TEXT"),
+        ("joining_date", "DATE")
+    ]
+    for col, typ in columns_to_add_teachers:
+        try:
+            c.execute(f"ALTER TABLE teachers ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError:
+            pass  # کالم پہلے سے موجود ہے
     
-    # طلبہ ٹیبل (تمام مطلوبہ کالمز کے ساتھ)
+    # ========== 2. طلبہ ٹیبل ==========
     c.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         father_name TEXT,
-        mother_name TEXT,
-        dob DATE,
-        admission_date DATE,
-        exit_date DATE,
-        exit_reason TEXT,
-        id_card TEXT,
-        photo TEXT,
-        phone TEXT,
-        address TEXT,
-        teacher_name TEXT,
-        dept TEXT,
-        class TEXT,
-        section TEXT
+        teacher_name TEXT
     )''')
+    columns_to_add_students = [
+        ("mother_name", "TEXT"),
+        ("dob", "DATE"),
+        ("admission_date", "DATE"),
+        ("exit_date", "DATE"),
+        ("exit_reason", "TEXT"),
+        ("id_card", "TEXT"),
+        ("photo", "TEXT"),
+        ("phone", "TEXT"),
+        ("address", "TEXT"),
+        ("dept", "TEXT"),
+        ("class", "TEXT"),
+        ("section", "TEXT")
+    ]
+    for col, typ in columns_to_add_students:
+        try:
+            c.execute(f"ALTER TABLE students ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError:
+            pass
     
-    # حفظ ریکارڈ
+    # ========== 3. حفظ ریکارڈ ==========
     c.execute('''CREATE TABLE IF NOT EXISTS hifz_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         r_date DATE,
@@ -69,7 +85,7 @@ def init_db():
         principal_note TEXT
     )''')
     
-    # عمومی تعلیم (درسِ نظامی اور عصری)
+    # ========== 4. عمومی تعلیم ==========
     c.execute('''CREATE TABLE IF NOT EXISTS general_education (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         r_date DATE,
@@ -83,7 +99,7 @@ def init_db():
         performance TEXT
     )''')
     
-    # اساتذہ حاضری
+    # ========== 5. اساتذہ حاضری ==========
     c.execute('''CREATE TABLE IF NOT EXISTS t_attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         t_name TEXT,
@@ -94,7 +110,7 @@ def init_db():
         actual_departure TEXT
     )''')
     
-    # رخصت درخواستیں (تمام کالمز)
+    # ========== 6. رخصت درخواستیں ==========
     c.execute('''CREATE TABLE IF NOT EXISTS leave_requests (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         t_name TEXT,
@@ -108,7 +124,7 @@ def init_db():
         notification_seen INTEGER DEFAULT 0
     )''')
     
-    # امتحانات
+    # ========== 7. امتحانات ==========
     c.execute('''CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         s_name TEXT,
@@ -128,7 +144,7 @@ def init_db():
         exam_type TEXT
     )''')
     
-    # پاس شدہ پارے
+    # ========== 8. پاس شدہ پارے ==========
     c.execute('''CREATE TABLE IF NOT EXISTS passed_paras (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         s_name TEXT,
@@ -138,7 +154,7 @@ def init_db():
         exam_type TEXT
     )''')
     
-    # ٹائم ٹیبل
+    # ========== 9. ٹائم ٹیبل ==========
     c.execute('''CREATE TABLE IF NOT EXISTS timetable (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         t_name TEXT,
@@ -148,7 +164,7 @@ def init_db():
         room TEXT
     )''')
     
-    # نوٹیفیکیشنز
+    # ========== 10. نوٹیفیکیشنز ==========
     c.execute('''CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
@@ -158,7 +174,7 @@ def init_db():
         seen INTEGER DEFAULT 0
     )''')
     
-    # آڈٹ لاگ
+    # ========== 11. آڈٹ لاگ ==========
     c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user TEXT,
@@ -169,13 +185,28 @@ def init_db():
     
     conn.commit()
     
-    # ڈیفالٹ ایڈمن صارف
-    c.execute("INSERT OR IGNORE INTO teachers (name, password, dept) VALUES (?,?,?)", ("admin", "jamia123", "Admin"))
+    # ========== 12. ڈیفالٹ ایڈمن صارف ==========
+    # پہلے چیک کریں کہ کیا ایڈمن پہلے سے موجود ہے
+    admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
+    if not admin_exists:
+        # اگر dept کالم موجود ہے تو اس کے ساتھ ڈالیں ورنہ بغیر
+        try:
+            # پہلے چیک کریں کہ dept کالم موجود ہے یا نہیں
+            c.execute("SELECT dept FROM teachers LIMIT 1")
+            c.execute("INSERT INTO teachers (name, password, dept) VALUES (?,?,?)", ("admin", "jamia123", "Admin"))
+        except sqlite3.OperationalError:
+            # dept کالم نہیں ہے، صرف name اور password ڈالیں
+            c.execute("INSERT INTO teachers (name, password) VALUES (?,?)", ("admin", "jamia123"))
     conn.commit()
     conn.close()
 
 init_db()
 
+# ==================== باقی کوڈ پہلے جیسا ہی ہے (صرف DB_NAME بدلا ہے) ====================
+# ... (یہاں سے نیچے تمام پچھلا کوڈ آئے گا، مگر DB_NAME اب اوپر متعین ہے)
+# میں نے پورا کوڈ دوبارہ نہیں لکھا کیونکہ یہ بہت طویل ہے،
+# لیکن آپ اپنے موجودہ کوڈ میں صرف DB_NAME کی لائن تبدیل کریں اور init_db کو اس محفوظ ورژن سے بدل دیں۔
+    
 # -------------------- 2. ہیلپر فنکشنز --------------------
 def log_audit(user, action, details=""):
     try:
