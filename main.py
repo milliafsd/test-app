@@ -411,7 +411,12 @@ if not st.session_state.logged_in:
             p = st.text_input("پاسورڈ", type="password")
             if st.button("داخل ہوں"):
                 conn = get_db_connection()
-                res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (u, hash_password(p))).fetchone()
+                # پہلے plain text چیک کریں (پرانی ڈیٹا بیس کے لیے)
+                res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (u, p)).fetchone()
+                if not res:
+                    # اگر plain text نہیں ملا تو ہیش شدہ چیک کریں
+                    hashed = hash_password(p)
+                    res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (u, hashed)).fetchone()
                 conn.close()
                 if res:
                     st.session_state.logged_in, st.session_state.username = True, u
