@@ -16,42 +16,61 @@ def get_db_connection():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+def column_exists(table, column):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(f"PRAGMA table_info({table})")
+    columns = [row[1] for row in c.fetchall()]
+    conn.close()
+    return column in columns
+
+def add_column_if_not_exists(table, column, col_type):
+    if not column_exists(table, column):
+        conn = get_db_connection()
+        c = conn.cursor()
+        try:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            conn.commit()
+        except:
+            pass
+        conn.close()
+
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
     
-    # اساتذہ ٹیبل (پاسورڈ ہیش شدہ)
+    # اساتذہ ٹیبل
     c.execute('''CREATE TABLE IF NOT EXISTS teachers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT UNIQUE,
-        password TEXT,
-        dept TEXT,
-        phone TEXT,
-        address TEXT,
-        id_card TEXT,
-        photo TEXT,
-        joining_date DATE
+        password TEXT
     )''')
+    add_column_if_not_exists('teachers', 'dept', 'TEXT')
+    add_column_if_not_exists('teachers', 'phone', 'TEXT')
+    add_column_if_not_exists('teachers', 'address', 'TEXT')
+    add_column_if_not_exists('teachers', 'id_card', 'TEXT')
+    add_column_if_not_exists('teachers', 'photo', 'TEXT')
+    add_column_if_not_exists('teachers', 'joining_date', 'DATE')
     
     # طلبہ ٹیبل
     c.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         father_name TEXT,
-        mother_name TEXT,
-        dob DATE,
-        admission_date DATE,
-        exit_date DATE,
-        exit_reason TEXT,
-        id_card TEXT,
-        photo TEXT,
-        phone TEXT,
-        address TEXT,
-        teacher_name TEXT,
-        dept TEXT,
-        class TEXT,
-        section TEXT
+        teacher_name TEXT
     )''')
+    add_column_if_not_exists('students', 'mother_name', 'TEXT')
+    add_column_if_not_exists('students', 'dob', 'DATE')
+    add_column_if_not_exists('students', 'admission_date', 'DATE')
+    add_column_if_not_exists('students', 'exit_date', 'DATE')
+    add_column_if_not_exists('students', 'exit_reason', 'TEXT')
+    add_column_if_not_exists('students', 'id_card', 'TEXT')
+    add_column_if_not_exists('students', 'photo', 'TEXT')
+    add_column_if_not_exists('students', 'phone', 'TEXT')
+    add_column_if_not_exists('students', 'address', 'TEXT')
+    add_column_if_not_exists('students', 'dept', 'TEXT')
+    add_column_if_not_exists('students', 'class', 'TEXT')
+    add_column_if_not_exists('students', 'section', 'TEXT')
     
     # حفظ ریکارڈ
     c.execute('''CREATE TABLE IF NOT EXISTS hifz_records (
@@ -70,11 +89,9 @@ def init_db():
         m_a INTEGER,
         m_m INTEGER,
         attendance TEXT,
-        principal_note TEXT,
-        lines INTEGER
+        principal_note TEXT
     )''')
-    try: c.execute("ALTER TABLE hifz_records ADD COLUMN lines INTEGER")
-    except: pass
+    add_column_if_not_exists('hifz_records', 'lines', 'INTEGER')
     
     # عمومی تعلیم
     c.execute('''CREATE TABLE IF NOT EXISTS general_education (
@@ -214,7 +231,7 @@ def get_grade_from_mistakes(total_mistakes):
 
 def generate_exam_result_card(exam_row):
     para_display = ""
-    if exam_row['from_para'] and exam_row['to_para']:
+    if exam_row.get('from_para') and exam_row.get('to_para'):
         if exam_row['from_para'] == exam_row['to_para']:
             para_display = f"پارہ {exam_row['from_para']}"
         else:
@@ -398,6 +415,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== 4. لاگ ان ====================
+def verify_login(username, password):
+    conn = get_db_connection()
+    # پہلے plain text چیک کریں (پرانی ڈیٹا بیس کے لیے)
+    res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (username, password)).fetchone()
+    if not res:
+        # اگر plain text نہیں ملا تو ہیش شدہ چیک کریں
+        hashed = hash_password(password)
+        res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (username, hashed)).fetchone()
+    conn.close()
+    return res
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -410,14 +438,7 @@ if not st.session_state.logged_in:
             u = st.text_input("صارف نام")
             p = st.text_input("پاسورڈ", type="password")
             if st.button("داخل ہوں"):
-                conn = get_db_connection()
-                # پہلے plain text چیک کریں (پرانی ڈیٹا بیس کے لیے)
-                res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (u, p)).fetchone()
-                if not res:
-                    # اگر plain text نہیں ملا تو ہیش شدہ چیک کریں
-                    hashed = hash_password(p)
-                    res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (u, hashed)).fetchone()
-                conn.close()
+                res = verify_login(u, p)
                 if res:
                     st.session_state.logged_in, st.session_state.username = True, u
                     st.session_state.user_type = "admin" if u == "admin" else "teacher"
@@ -453,28 +474,35 @@ surahs_urdu = ["الفاتحة", "البقرة", "آل عمران", "النسا�
                "الفیل", "قریش", "الماعون", "الکوثر", "الکافرون", "النصر", "المسد", "الإخلاص", "الفلق", "الناس"]
 paras = [f"پارہ {i}" for i in range(1, 31)]
 
-# ==================== 7. پاسورڈ تبدیل کرنے کا فنکشن ====================
-def change_password(user, old_pass, new_pass):
+# ==================== 7. پاسورڈ تبدیل کرنے کے فنکشنز ====================
+def verify_password(user, plain_password):
     conn = get_db_connection()
-    c = conn.cursor()
-    old_hash = hash_password(old_pass)
-    res = c.execute("SELECT 1 FROM teachers WHERE name=? AND password=?", (user, old_hash)).fetchone()
-    if res:
-        new_hash = hash_password(new_pass)
-        c.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, user))
-        conn.commit()
-        conn.close()
-        log_audit(user, "Password Changed", "Success")
-        return True
-    else:
-        conn.close()
+    res = conn.execute("SELECT password FROM teachers WHERE name=?", (user,)).fetchone()
+    conn.close()
+    if not res:
         return False
+    stored = res[0]
+    if stored == plain_password:
+        return True
+    if stored == hash_password(plain_password):
+        return True
+    return False
+
+def change_password(user, old_pass, new_pass):
+    if not verify_password(user, old_pass):
+        return False
+    conn = get_db_connection()
+    new_hash = hash_password(new_pass)
+    conn.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, user))
+    conn.commit()
+    conn.close()
+    log_audit(user, "Password Changed", "Success")
+    return True
 
 def admin_reset_password(teacher_name, new_pass):
     conn = get_db_connection()
-    c = conn.cursor()
     new_hash = hash_password(new_pass)
-    c.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, teacher_name))
+    conn.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, teacher_name))
     conn.commit()
     conn.close()
     log_audit(st.session_state.username, "Admin Reset Password", f"Teacher: {teacher_name}")
@@ -504,7 +532,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         sel_teacher = st.selectbox("استاد / کلاس", teachers_list)
         dept_filter = st.selectbox("شعبہ", ["تمام", "حفظ", "درسِ نظامی", "عصری تعلیم"])
     
-    # ڈیٹا لوڈ
     combined_df = pd.DataFrame()
     if dept_filter in ["تمام", "حفظ"]:
         conn = get_db_connection()
@@ -544,7 +571,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         if st.button("💾 تمام تبدیلیاں محفوظ کریں"):
             conn = get_db_connection()
             c = conn.cursor()
-            # حذف کریں
             if dept_filter in ["تمام", "حفظ"]:
                 del_query = "DELETE FROM hifz_records WHERE r_date BETWEEN ? AND ?"
                 del_params = [d1, d2]
@@ -563,7 +589,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
                     del_params_gen.append(dept_filter)
                 c.execute(del_query_gen, del_params_gen)
             
-            # دوبارہ داخل کریں
             for _, row in edited_df.iterrows():
                 if row['شعبہ'] == 'حفظ':
                     c.execute("""INSERT INTO hifz_records 
@@ -777,14 +802,21 @@ elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_
                     conn.close()
                     st.rerun()
 
-# 8.8 یوزر مینجمنٹ (ایڈمن)
+# 8.8 یوزر مینجمنٹ (ایڈمن) - درست شدہ ورژن
 elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type == "admin":
     st.header("👥 یوزر مینجمنٹ")
     tab1, tab2 = st.tabs(["اساتذہ", "طلبہ"])
     with tab1:
         st.subheader("موجودہ اساتذہ")
         conn = get_db_connection()
-        teachers_df = pd.read_sql_query("SELECT id, name, password, dept, phone, address, id_card, joining_date FROM teachers WHERE name!='admin'", conn)
+        # صرف موجودہ کالمز کو منتخب کریں
+        columns = ["id", "name", "password", "dept", "phone", "address", "id_card", "joining_date"]
+        existing_cols = []
+        for col in columns:
+            if column_exists("teachers", col):
+                existing_cols.append(col)
+        query = f"SELECT {', '.join(existing_cols)} FROM teachers WHERE name!='admin'"
+        teachers_df = pd.read_sql_query(query, conn)
         conn.close()
         if not teachers_df.empty:
             edited_teachers = st.data_editor(teachers_df, num_rows="dynamic", use_container_width=True, key="teachers_edit")
@@ -793,8 +825,8 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                 c = conn.cursor()
                 c.execute("DELETE FROM teachers WHERE name!='admin'")
                 for _, row in edited_teachers.iterrows():
-                    c.execute("INSERT INTO teachers (id, name, password, dept, phone, address, id_card, joining_date) VALUES (?,?,?,?,?,?,?,?)",
-                              (row['id'], row['name'], row['password'], row['dept'], row['phone'], row['address'], row['id_card'], row['joining_date']))
+                    placeholders = ",".join(["?" for _ in existing_cols])
+                    c.execute(f"INSERT INTO teachers ({','.join(existing_cols)}) VALUES ({placeholders})", tuple(row[col] for col in existing_cols))
                 conn.commit()
                 conn.close()
                 st.success("تبدیلیاں محفوظ ہو گئیں")
@@ -836,13 +868,14 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
     with tab2:
         st.subheader("موجودہ طلبہ")
         conn = get_db_connection()
-        try:
-            students_df = pd.read_sql_query("""SELECT id, name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
-                                              id_card, phone, address, teacher_name, dept, class, section
-                                              FROM students""", conn)
-        except Exception as e:
-            st.error(f"ڈیٹا لوڈ کرنے میں خرابی: {str(e)}")
-            students_df = pd.DataFrame()
+        columns = ["id", "name", "father_name", "mother_name", "dob", "admission_date", "exit_date", "exit_reason",
+                   "id_card", "phone", "address", "teacher_name", "dept", "class", "section"]
+        existing_cols = []
+        for col in columns:
+            if column_exists("students", col):
+                existing_cols.append(col)
+        query = f"SELECT {', '.join(existing_cols)} FROM students"
+        students_df = pd.read_sql_query(query, conn)
         conn.close()
         if not students_df.empty:
             edited_students = st.data_editor(students_df, num_rows="dynamic", use_container_width=True, key="students_edit")
@@ -851,13 +884,8 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                 c = conn.cursor()
                 c.execute("DELETE FROM students")
                 for _, row in edited_students.iterrows():
-                    c.execute("""INSERT INTO students 
-                                (id, name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
-                                 id_card, phone, address, teacher_name, dept, class, section)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                              (row['id'], row['name'], row['father_name'], row['mother_name'], row['dob'], row['admission_date'],
-                               row['exit_date'], row['exit_reason'], row['id_card'], row['phone'], row['address'],
-                               row['teacher_name'], row['dept'], row['class'], row['section']))
+                    placeholders = ",".join(["?" for _ in existing_cols])
+                    c.execute(f"INSERT INTO students ({','.join(existing_cols)}) VALUES ({placeholders})", tuple(row[col] for col in existing_cols))
                 conn.commit()
                 conn.close()
                 st.success("تبدیلیاں محفوظ ہو گئیں")
@@ -972,43 +1000,8 @@ elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.us
                     conn.close()
                     st.rerun()
 
-# ==================== پاسورڈ تبدیل کرنے کا سیکشن ====================
-def verify_password(user, plain_password):
-    """پرانا پاسورڈ plain text بھی ہو سکتا ہے یا ہیش شدہ"""
-    conn = get_db_connection()
-    # پہلے plain text چیک کریں
-    res = conn.execute("SELECT password FROM teachers WHERE name=?", (user,)).fetchone()
-    conn.close()
-    if not res:
-        return False
-    stored = res[0]
-    if stored == plain_password:
-        return True
-    if stored == hash_password(plain_password):
-        return True
-    return False
-
-def change_password(user, old_pass, new_pass):
-    if not verify_password(user, old_pass):
-        return False
-    conn = get_db_connection()
-    new_hash = hash_password(new_pass)
-    conn.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, user))
-    conn.commit()
-    conn.close()
-    log_audit(user, "Password Changed", "Success")
-    return True
-
-def admin_reset_password(teacher_name, new_pass):
-    conn = get_db_connection()
-    new_hash = hash_password(new_pass)
-    conn.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, teacher_name))
-    conn.commit()
-    conn.close()
-    log_audit(st.session_state.username, "Admin Reset Password", f"Teacher: {teacher_name}")
-
-# یہ سیکشن مینو میں شامل کریں
-if selected == "🔑 پاسورڈ تبدیل کریں":
+# 8.10 پاسورڈ تبدیل کریں (ایڈمن اور استاد)
+elif selected == "🔑 پاسورڈ تبدیل کریں":
     st.header("🔑 پاسورڈ تبدیل کریں")
     if st.session_state.user_type == "admin":
         conn = get_db_connection()
@@ -1096,7 +1089,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         st.dataframe(logs)
 
 # ==================== 9. استاد کے سیکشن ====================
-# 9.1 روزانہ سبق اندراج
+# 9.1 روزانہ سبق اندراج (مکمل - پہلے کی طرح)
 if selected == "📝 روزانہ سبق اندراج" and st.session_state.user_type == "teacher":
     st.header("📝 روزانہ سبق اندراج")
     dept = st.selectbox("شعبہ منتخب کریں", ["حفظ", "درسِ نظامی", "عصری تعلیم"])
