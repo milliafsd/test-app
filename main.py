@@ -967,8 +967,43 @@ elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.us
                     conn.close()
                     st.rerun()
 
-# 8.10 پاسورڈ تبدیل کریں (ایڈمن اور استاد)
-elif selected == "🔑 پاسورڈ تبدیل کریں":
+# ==================== پاسورڈ تبدیل کرنے کا سیکشن ====================
+def verify_password(user, plain_password):
+    """پرانا پاسورڈ plain text بھی ہو سکتا ہے یا ہیش شدہ"""
+    conn = get_db_connection()
+    # پہلے plain text چیک کریں
+    res = conn.execute("SELECT password FROM teachers WHERE name=?", (user,)).fetchone()
+    conn.close()
+    if not res:
+        return False
+    stored = res[0]
+    if stored == plain_password:
+        return True
+    if stored == hash_password(plain_password):
+        return True
+    return False
+
+def change_password(user, old_pass, new_pass):
+    if not verify_password(user, old_pass):
+        return False
+    conn = get_db_connection()
+    new_hash = hash_password(new_pass)
+    conn.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, user))
+    conn.commit()
+    conn.close()
+    log_audit(user, "Password Changed", "Success")
+    return True
+
+def admin_reset_password(teacher_name, new_pass):
+    conn = get_db_connection()
+    new_hash = hash_password(new_pass)
+    conn.execute("UPDATE teachers SET password=? WHERE name=?", (new_hash, teacher_name))
+    conn.commit()
+    conn.close()
+    log_audit(st.session_state.username, "Admin Reset Password", f"Teacher: {teacher_name}")
+
+# یہ سیکشن مینو میں شامل کریں
+if selected == "🔑 پاسورڈ تبدیل کریں":
     st.header("🔑 پاسورڈ تبدیل کریں")
     if st.session_state.user_type == "admin":
         conn = get_db_connection()
