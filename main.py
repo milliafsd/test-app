@@ -207,8 +207,8 @@ c.execute('''CREATE TABLE IF NOT EXISTS staff_monitoring (
     created_at DATETIME
 )''')
     # ڈیفالٹ ایڈمن (پاسورڈ ہیش شدہ)
-    admin_hash = hash_password("jamia123")
-    admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
+        admin_hash = hash_password("jamia123")
+        admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
     if not admin_exists:
         c.execute("INSERT INTO teachers (name, password, dept) VALUES (?,?,?)", ("admin", admin_hash, "Admin"))
     conn.commit()
