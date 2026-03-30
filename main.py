@@ -519,9 +519,8 @@ if selected == "📊 ایڈمن ڈیش بورڈ" and st.session_state.user_type 
     col2.metric("کل اساتذہ", total_teachers)
     conn.close()
 
-# 8.2 یومیہ تعلیمی رپورٹ (ترمیم، حذف، اضافہ کے ساتھ)
 elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
-    st.header("📊 یومیہ تعلیمی رپورٹ - ترمیم، حذف، اضافہ")
+    st.header("📊 یومیہ تعلیمی رپورٹ (طلاب) - ترمیم، حذف، اضافہ")
     
     with st.sidebar:
         d1 = st.date_input("تاریخ آغاز", date.today().replace(day=1))
@@ -532,24 +531,93 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         sel_teacher = st.selectbox("استاد / کلاس", teachers_list)
         dept_filter = st.selectbox("شعبہ", ["تمام", "حفظ", "درسِ نظامی", "عصری تعلیم"])
     
-    combined_df = pd.DataFrame()
-    if dept_filter in ["تمام", "حفظ"]:
+    def get_existing_columns(table_name):
         conn = get_db_connection()
-        query = "SELECT r_date as تاریخ, s_name as نام, f_name as ولدیت, t_name as استاد, 'حفظ' as شعبہ, surah as 'سبق/کتاب', lines as 'کل ستر', sq_m as سبقی_غلطی, m_m as منزل_غلطی, attendance as حاضری FROM hifz_records WHERE r_date BETWEEN ? AND ?"
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        cols = [row[1] for row in cursor.fetchall()]
+        conn.close()
+        return cols
+    
+    combined_df = pd.DataFrame()
+    
+    # ---- حفظ (Hifz) ----
+    if dept_filter in ["تمام", "حفظ"]:
+        hifz_cols = get_existing_columns("hifz_records")
+        select_parts = []
+        if 'r_date' in hifz_cols:
+            select_parts.append("r_date as تاریخ")
+        if 's_name' in hifz_cols:
+            select_parts.append("s_name as نام")
+        # پہلے father_name، ورنہ f_name
+        if 'father_name' in hifz_cols:
+            select_parts.append("father_name as 'والد کا نام'")
+        elif 'f_name' in hifz_cols:
+            select_parts.append("f_name as 'والد کا نام'")
+        if 't_name' in hifz_cols:
+            select_parts.append("t_name as استاد")
+        if 'surah' in hifz_cols:
+            select_parts.append("surah as 'سبق/کتاب'")
+        if 'lines' in hifz_cols:
+            select_parts.append("lines as 'کل ستر'")
+        if 'sq_m' in hifz_cols:
+            select_parts.append("sq_m as سبقی_غلطی")
+        if 'm_m' in hifz_cols:
+            select_parts.append("m_m as منزل_غلطی")
+        if 'attendance' in hifz_cols:
+            select_parts.append("attendance as حاضری")
+        if not select_parts:
+            select_parts = ["*"]
+        
+        query = f"SELECT {', '.join(select_parts)} FROM hifz_records WHERE r_date BETWEEN ? AND ?"
         params = [d1, d2]
         if sel_teacher != "تمام":
             query += " AND t_name = ?"
             params.append(sel_teacher)
-        hifz_df = pd.read_sql_query(query, conn, params=params)
-        conn.close()
-        if not hifz_df.empty:
-            hifz_df['کل_غلطیاں'] = hifz_df['سبقی_غلطی'] + hifz_df['منزل_غلطی']
-            hifz_df['درجہ'] = hifz_df['کل_غلطیاں'].apply(get_grade_from_mistakes)
-            combined_df = pd.concat([combined_df, hifz_df], ignore_index=True)
+        
+        try:
+            conn = get_db_connection()
+            hifz_df = pd.read_sql_query(query, conn, params=params)
+            conn.close()
+            if not hifz_df.empty:
+                hifz_df['شعبہ'] = 'حفظ'
+                if 'سبقی_غلطی' in hifz_df.columns and 'منزل_غلطی' in hifz_df.columns:
+                    hifz_df['کل_غلطیاں'] = hifz_df['سبقی_غلطی'].fillna(0) + hifz_df['منزل_غلطی'].fillna(0)
+                    hifz_df['درجہ'] = hifz_df['کل_غلطیاں'].apply(get_grade_from_mistakes)
+                combined_df = pd.concat([combined_df, hifz_df], ignore_index=True)
+        except Exception as e:
+            st.error(f"حفظ کے ریکارڈ لوڈ کرتے وقت خرابی: {str(e)}")
     
+    # ---- عمومی تعلیم (درسِ نظامی / عصری) ----
     if dept_filter in ["تمام", "درسِ نظامی", "عصری تعلیم"]:
-        conn = get_db_connection()
-        query = "SELECT r_date as تاریخ, s_name as نام, f_name as ولدیت, t_name as استاد, dept as شعبہ, book_subject as 'سبق/کتاب', today_lesson as 'آج کا سبق', homework as 'ہوم ورک', performance as کارکردگی, '' as کل_غلطیاں, '' as درجہ, attendance as حاضری FROM general_education WHERE r_date BETWEEN ? AND ?"
+        gen_cols = get_existing_columns("general_education")
+        select_parts = []
+        if 'r_date' in gen_cols:
+            select_parts.append("r_date as تاریخ")
+        if 's_name' in gen_cols:
+            select_parts.append("s_name as نام")
+        if 'father_name' in gen_cols:
+            select_parts.append("father_name as 'والد کا نام'")
+        elif 'f_name' in gen_cols:
+            select_parts.append("f_name as 'والد کا نام'")
+        if 't_name' in gen_cols:
+            select_parts.append("t_name as استاد")
+        if 'dept' in gen_cols:
+            select_parts.append("dept as شعبہ")
+        if 'book_subject' in gen_cols:
+            select_parts.append("book_subject as 'سبق/کتاب'")
+        if 'today_lesson' in gen_cols:
+            select_parts.append("today_lesson as 'آج کا سبق'")
+        if 'homework' in gen_cols:
+            select_parts.append("homework as 'ہوم ورک'")
+        if 'performance' in gen_cols:
+            select_parts.append("performance as کارکردگی")
+        if 'attendance' in gen_cols:
+            select_parts.append("attendance as حاضری")
+        if not select_parts:
+            select_parts = ["*"]
+        
+        query = f"SELECT {', '.join(select_parts)} FROM general_education WHERE r_date BETWEEN ? AND ?"
         params = [d1, d2]
         if sel_teacher != "تمام":
             query += " AND t_name = ?"
@@ -557,10 +625,18 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         if dept_filter != "تمام":
             query += " AND dept = ?"
             params.append(dept_filter)
-        gen_df = pd.read_sql_query(query, conn, params=params)
-        conn.close()
-        if not gen_df.empty:
-            combined_df = pd.concat([combined_df, gen_df], ignore_index=True)
+        
+        try:
+            conn = get_db_connection()
+            gen_df = pd.read_sql_query(query, conn, params=params)
+            conn.close()
+            if not gen_df.empty:
+                for col in ['کل_غلطیاں', 'درجہ']:
+                    if col not in gen_df.columns:
+                        gen_df[col] = ''
+                combined_df = pd.concat([combined_df, gen_df], ignore_index=True)
+        except Exception as e:
+            st.error(f"عمومی تعلیم کے ریکارڈ لوڈ کرتے وقت خرابی: {str(e)}")
     
     if combined_df.empty:
         st.warning("کوئی ریکارڈ نہیں ملا")
@@ -571,6 +647,7 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         if st.button("💾 تمام تبدیلیاں محفوظ کریں"):
             conn = get_db_connection()
             c = conn.cursor()
+            # پرانے ریکارڈ حذف کریں
             if dept_filter in ["تمام", "حفظ"]:
                 del_query = "DELETE FROM hifz_records WHERE r_date BETWEEN ? AND ?"
                 del_params = [d1, d2]
@@ -589,33 +666,64 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
                     del_params_gen.append(dept_filter)
                 c.execute(del_query_gen, del_params_gen)
             
+            # نئے ریکارڈ داخل کریں
             for _, row in edited_df.iterrows():
-                if row['شعبہ'] == 'حفظ':
-                    c.execute("""INSERT INTO hifz_records 
-                                (r_date, s_name, f_name, t_name, surah, lines, sq_m, m_m, attendance)
-                                VALUES (?,?,?,?,?,?,?,?,?)""",
-                              (row['تاریخ'], row['نام'], row['ولدیت'], row['استاد'], 
-                               row['سبق/کتاب'], row['کل ستر'] if pd.notna(row['کل ستر']) else 0,
-                               row['سبقی_غلطی'] if 'سبقی_غلطی' in row and pd.notna(row['سبقی_غلطی']) else 0,
-                               row['منزل_غلطی'] if 'منزل_غلطی' in row and pd.notna(row['منزل_غلطی']) else 0,
-                               row['حاضری']))
+                if row.get('شعبہ') == 'حفظ':
+                    mapping = {
+                        'تاریخ': 'r_date',
+                        'نام': 's_name',
+                        'والد کا نام': 'father_name',
+                        'استاد': 't_name',
+                        'سبق/کتاب': 'surah',
+                        'کل ستر': 'lines',
+                        'سبقی_غلطی': 'sq_m',
+                        'منزل_غلطی': 'm_m',
+                        'حاضری': 'attendance'
+                    }
+                    insert_cols = []
+                    insert_vals = []
+                    for display_col, db_col in mapping.items():
+                        if display_col in row and pd.notna(row[display_col]) and row[display_col] != '':
+                            insert_cols.append(db_col)
+                            val = row[display_col]
+                            if db_col in ['lines', 'sq_m', 'm_m']:
+                                val = int(val) if str(val).isdigit() else 0
+                            insert_vals.append(val)
+                    if insert_cols:
+                        placeholders = ','.join(['?' for _ in insert_cols])
+                        sql = f"INSERT INTO hifz_records ({','.join(insert_cols)}) VALUES ({placeholders})"
+                        c.execute(sql, insert_vals)
                 else:
-                    c.execute("""INSERT INTO general_education 
-                                (r_date, s_name, f_name, t_name, dept, book_subject, today_lesson, homework, performance, attendance)
-                                VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                              (row['تاریخ'], row['نام'], row['ولدیت'], row['استاد'], row['شعبہ'],
-                               row['سبق/کتاب'], row['آج کا سبق'] if 'آج کا سبق' in row else '',
-                               row['ہوم ورک'] if 'ہوم ورک' in row else '',
-                               row['کارکردگی'] if 'کارکردگی' in row else '',
-                               row['حاضری']))
+                    mapping = {
+                        'تاریخ': 'r_date',
+                        'نام': 's_name',
+                        'والد کا نام': 'father_name',
+                        'استاد': 't_name',
+                        'شعبہ': 'dept',
+                        'سبق/کتاب': 'book_subject',
+                        'آج کا سبق': 'today_lesson',
+                        'ہوم ورک': 'homework',
+                        'کارکردگی': 'performance',
+                        'حاضری': 'attendance'
+                    }
+                    insert_cols = []
+                    insert_vals = []
+                    for display_col, db_col in mapping.items():
+                        if display_col in row and pd.notna(row[display_col]) and row[display_col] != '':
+                            insert_cols.append(db_col)
+                            insert_vals.append(row[display_col])
+                    if insert_cols:
+                        placeholders = ','.join(['?' for _ in insert_cols])
+                        sql = f"INSERT INTO general_education ({','.join(insert_cols)}) VALUES ({placeholders})"
+                        c.execute(sql, insert_vals)
             conn.commit()
             conn.close()
             log_audit(st.session_state.username, "Edited Daily Report", f"Date range {d1} to {d2}, Teacher {sel_teacher}")
             st.success("تبدیلیاں محفوظ ہو گئیں")
             st.rerun()
         
-        html_report = generate_html_report(edited_df, "یومیہ تعلیمی رپورٹ", start_date=d1.strftime("%Y-%m-%d"), end_date=d2.strftime("%Y-%m-%d"))
-        st.download_button("📥 HTML رپورٹ ڈاؤن لوڈ کریں", html_report, "daily_report.html", "text/html")
+        html_report = generate_html_report(edited_df, "یومیہ تعلیمی رپورٹ (طلاب)", start_date=d1.strftime("%Y-%m-%d"), end_date=d2.strftime("%Y-%m-%d"))
+        st.download_button("📥 HTML رپورٹ ڈاؤن لوڈ کریں", html_report, "daily_report_boys.html", "text/html")
         if st.button("🖨️ پرنٹ کریں"):
             st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_report}`);w.print();</script>", height=0)
 
