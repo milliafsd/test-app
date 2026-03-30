@@ -41,7 +41,7 @@ def init_db():
         try: c.execute(f"ALTER TABLE students ADD COLUMN {col} {typ}")
         except: pass
     
-    # حفظ ریکارڈ (اب ناغہ کے لیے extra columns شامل ہیں)
+    # حفظ ریکارڈ
     c.execute('''CREATE TABLE IF NOT EXISTS hifz_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         r_date DATE, s_name TEXT, f_name TEXT, t_name TEXT,
@@ -73,16 +73,21 @@ def init_db():
         notification_seen INTEGER DEFAULT 0
     )''')
     
-    # امتحانات
+    # امتحانات (اب from_para اور to_para شامل)
     c.execute('''CREATE TABLE IF NOT EXISTS exams (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        s_name TEXT, f_name TEXT, dept TEXT, para_no INTEGER,
+        s_name TEXT, f_name TEXT, dept TEXT,
+        from_para INTEGER, to_para INTEGER,
         start_date TEXT, end_date TEXT,
         q1 INTEGER, q2 INTEGER, q3 INTEGER, q4 INTEGER, q5 INTEGER,
         total INTEGER, grade TEXT, status TEXT, exam_type TEXT
     )''')
+    try: c.execute("ALTER TABLE exams ADD COLUMN from_para INTEGER")
+    except: pass
+    try: c.execute("ALTER TABLE exams ADD COLUMN to_para INTEGER")
+    except: pass
     
-    # پاس شدہ پارے (اب گریڈ بھی شامل)
+    # پاس شدہ پارے
     c.execute('''CREATE TABLE IF NOT EXISTS passed_paras (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         s_name TEXT, f_name TEXT, para_no INTEGER,
@@ -150,6 +155,14 @@ def get_grade_from_mistakes(total_mistakes):
 
 def generate_exam_result_card(exam_row):
     """ایک امتحان کے ریکارڈ سے رزلٹ کارڈ HTML بنائیں"""
+    para_display = ""
+    if exam_row['from_para'] and exam_row['to_para']:
+        if exam_row['from_para'] == exam_row['to_para']:
+            para_display = f"پارہ {exam_row['from_para']}"
+        else:
+            para_display = f"پارہ {exam_row['from_para']} تا {exam_row['to_para']}"
+    else:
+        para_display = "-"
     html = f"""
     <!DOCTYPE html>
     <html dir="rtl">
@@ -171,12 +184,12 @@ def generate_exam_result_card(exam_row):
             <h3>رزلٹ کارڈ</h3>
             <p><b>نام:</b> {exam_row['s_name']} ولد {exam_row['f_name']}</p>
             <p><b>امتحان کی قسم:</b> {exam_row['exam_type']}</p>
-            <p><b>پارہ نمبر:</b> {exam_row['para_no'] if exam_row['para_no'] else '-'}</p>
+            <p><b>{para_display}</b></p>
             <p><b>تاریخ:</b> {exam_row['start_date']} تا {exam_row['end_date']}</p>
             <table>
-                <tr><th>سوال</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>کل</th>\\
+                <tr><th>سوال</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>کل</th></tr>
                 <tr><td>نمبر</td><td>{exam_row['q1']}</td><td>{exam_row['q2']}</td><td>{exam_row['q3']}</td><td>{exam_row['q4']}</td><td>{exam_row['q5']}</td><td>{exam_row['total']}</td></tr>
-             </table>
+            </table>
             <p><b>گریڈ:</b> {exam_row['grade']}</p>
             <div class="footer">
                 <span>دستخط استاذ: _________________</span>
@@ -436,17 +449,15 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
     tab1, tab2 = st.tabs(["پینڈنگ امتحانات", "مکمل شدہ"])
     with tab1:
         conn = get_db_connection()
-        pending = conn.execute("SELECT id, s_name, f_name, dept, para_no, start_date, exam_type FROM exams WHERE status=?", ("پینڈنگ",)).fetchall()
+        pending = conn.execute("SELECT id, s_name, f_name, dept, from_para, to_para, start_date, exam_type FROM exams WHERE status=?", ("پینڈنگ",)).fetchall()
         conn.close()
         if not pending:
             st.info("کوئی پینڈنگ امتحان نہیں")
         else:
-            for eid, sn, fn, dept, pn, sd, etype in pending:
-                with st.expander(f"{sn} ولد {fn} | {dept} | {etype} | پارہ {pn if pn else 'N/A'}"):
+            for eid, sn, fn, dept, fp, tp, sd, etype in pending:
+                with st.expander(f"{sn} ولد {fn} | {dept} | {etype} | {fp} تا {tp}"):
                     st.write(f"**تاریخ ابتدا:** {sd}")
                     end_date = st.date_input("تاریخ اختتام", date.today(), key=f"end_{eid}")
-                    if etype == "پارہ ٹیسٹ" and pn > 0:
-                        st.info(f"پارہ نمبر {pn} کا امتحان")
                     cols = st.columns(5)
                     q1 = cols[0].number_input("س1", 0, 20, key=f"q1_{eid}")
                     q2 = cols[1].number_input("س2", 0, 20, key=f"q2_{eid}")
@@ -465,30 +476,32 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
                         c = conn.cursor()
                         c.execute("""UPDATE exams SET q1=?, q2=?, q3=?, q4=?, q5=?, total=?, grade=?, status=?, end_date=? WHERE id=?""",
                                   (q1,q2,q3,q4,q5,total,g,"مکمل", end_date, eid))
-                        if etype == "پارہ ٹیسٹ" and g != "ناکام" and pn > 0:
-                            existing = c.execute("SELECT 1 FROM passed_paras WHERE s_name=? AND f_name=? AND para_no=?", (sn, fn, pn)).fetchone()
-                            if not existing:
-                                c.execute("INSERT INTO passed_paras (s_name, f_name, para_no, passed_date, exam_type, grade) VALUES (?,?,?,?,?,?)",
-                                          (sn, fn, pn, date.today(), etype, g))
+                        if g != "ناکام":
+                            # پاس شدہ پارے شامل کریں (ہر پارہ الگ)
+                            for para in range(fp, tp+1):
+                                existing = c.execute("SELECT 1 FROM passed_paras WHERE s_name=? AND f_name=? AND para_no=?", (sn, fn, para)).fetchone()
+                                if not existing:
+                                    c.execute("INSERT INTO passed_paras (s_name, f_name, para_no, passed_date, exam_type, grade) VALUES (?,?,?,?,?,?)",
+                                              (sn, fn, para, date.today(), etype, g))
                         conn.commit()
                         # امتحان کا رزلٹ کارڈ تیار کریں
                         exam_row = c.execute("SELECT * FROM exams WHERE id=?", (eid,)).fetchone()
                         conn.close()
                         exam_dict = {
                             'id': exam_row[0], 's_name': exam_row[1], 'f_name': exam_row[2],
-                            'dept': exam_row[3], 'para_no': exam_row[4], 'start_date': exam_row[5],
-                            'end_date': exam_row[6], 'q1': exam_row[7], 'q2': exam_row[8],
-                            'q3': exam_row[9], 'q4': exam_row[10], 'q5': exam_row[11],
-                            'total': exam_row[12], 'grade': exam_row[13], 'status': exam_row[14],
-                            'exam_type': exam_row[15]
+                            'dept': exam_row[3], 'from_para': exam_row[4], 'to_para': exam_row[5],
+                            'start_date': exam_row[6], 'end_date': exam_row[7],
+                            'q1': exam_row[8], 'q2': exam_row[9], 'q3': exam_row[10],
+                            'q4': exam_row[11], 'q5': exam_row[12], 'total': exam_row[13],
+                            'grade': exam_row[14], 'status': exam_row[15], 'exam_type': exam_row[16]
                         }
                         result_html = generate_exam_result_card(exam_dict)
                         st.success("امتحان کلیئر کر دیا گیا")
-                        st.download_button("📥 رزلٹ کارڈ ڈاؤن لوڈ کریں", result_html, f"Result_{sn}_{pn}.html", "text/html")
+                        st.download_button("📥 رزلٹ کارڈ ڈاؤن لوڈ کریں", result_html, f"Result_{sn}_{fp}-{tp}.html", "text/html")
                         st.rerun()
     with tab2:
         conn = get_db_connection()
-        hist = pd.read_sql_query("SELECT s_name, f_name, dept, para_no, total, grade, exam_type, end_date FROM exams WHERE status='مکمل' ORDER BY end_date DESC", conn)
+        hist = pd.read_sql_query("SELECT s_name, f_name, dept, from_para, to_para, total, grade, exam_type, end_date FROM exams WHERE status='مکمل' ORDER BY end_date DESC", conn)
         conn.close()
         if not hist.empty:
             st.dataframe(hist, use_container_width=True)
@@ -512,22 +525,12 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
         else:
             for s, f in students:
                 key = f"{s}_{f}"
-                
                 st.markdown(f"### 👤 {s} ولد {f}")
-                # حاضری کے تین آپشن: حاضر، غیر حاضر، رخصت
+                # حاضری کے تین آپشن
                 att = st.radio("حاضری", ["حاضر", "غیر حاضر", "رخصت"], key=f"att_{key}", horizontal=True)
                 
-                # ناغہ کے جھنڈے
-                if "sabaq_nagha" not in st.session_state:
-                    st.session_state[f"sabaq_nagha_{key}"] = False
-                if "sq_nagha" not in st.session_state:
-                    st.session_state[f"sq_nagha_{key}"] = False
-                if "m_nagha" not in st.session_state:
-                    st.session_state[f"m_nagha_{key}"] = False
-                
-                # اگر حاضری "غیر حاضر" یا "رخصت" ہو تو سبق/سبقی/منزل کی تفصیل نہیں لی جائے گی
                 if att == "حاضر":
-                    # سبق (ناغہ کی آپشن)
+                    # سبق ناغہ
                     sabaq_nagha = st.checkbox("سبق ناغہ", key=f"sabaq_nagha_{key}")
                     if not sabaq_nagha:
                         surah = st.selectbox("سورت", surahs_urdu, key=f"surah_{key}")
@@ -537,10 +540,9 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                     else:
                         sabq = "ناغہ"
                     
-                    # سبقی (ناغہ کی آپشن)
+                    # سبقی
                     sq_nagha = st.checkbox("سبقی ناغہ", key=f"sq_nagha_{key}")
                     if not sq_nagha:
-                        # سبقی کے متعدد پارے (پہلے جیسے)
                         if f"sq_rows_{key}" not in st.session_state:
                             st.session_state[f"sq_rows_{key}"] = 1
                         st.write("**سبقی**")
@@ -560,7 +562,7 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                         sq_parts = ["ناغہ"]
                         sq_a = sq_m = 0
                     
-                    # منزل (ناغہ کی آپشن)
+                    # منزل
                     m_nagha = st.checkbox("منزل ناغہ", key=f"m_nagha_{key}")
                     if not m_nagha:
                         if f"m_rows_{key}" not in st.session_state:
@@ -600,7 +602,6 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                             st.success("محفوظ ہو گیا")
                         conn.close()
                 else:
-                    # غیر حاضر یا رخصت ہونے کی صورت میں صرف حاضری محفوظ کریں
                     if st.button(f"محفوظ کریں ({s})", key=f"save_absent_{key}"):
                         conn = get_db_connection()
                         c = conn.cursor()
@@ -629,7 +630,6 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                 records = []
                 for s, f in students:
                     st.markdown(f"### {s} ولد {f}")
-                    # یہاں بھی حاضری کے تین آپشن
                     att = st.radio("حاضری", ["حاضر", "غیر حاضر", "رخصت"], key=f"att_dars_{s}", horizontal=True)
                     if att == "حاضر":
                         book = st.text_input("کتاب کا نام", key=f"book_{s}")
@@ -637,7 +637,6 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                         perf = st.select_slider("کارکردگی", ["بہت بہتر", "بہتر", "مناسب", "کمزور"], key=f"perf_{s}")
                         records.append((today, s, f, st.session_state.username, "درسِ نظامی", book, lesson, "", perf, att))
                     else:
-                        # غیر حاضر یا رخصت
                         records.append((today, s, f, st.session_state.username, "درسِ نظامی", "ناغہ", "ناغہ", "", "ناغہ", att))
                 if st.form_submit_button("محفوظ کریں"):
                     conn = get_db_connection()
@@ -679,7 +678,7 @@ elif selected == "📝 روزانہ سبق اندراج" and st.session_state.us
                     conn.close()
                     st.success("محفوظ ہو گیا")
 
-# ==================== 10. استاد کی امتحانی درخواست ====================
+# ==================== 10. استاد کی امتحانی درخواست (پارہ نمبر کی حد) ====================
 elif selected == "🎓 امتحانی درخواست" and st.session_state.user_type == "teacher":
     st.subheader("امتحان کے لیے طالب علم نامزد کریں")
     conn = get_db_connection()
@@ -695,17 +694,25 @@ elif selected == "🎓 امتحانی درخواست" and st.session_state.user_
             f_name, dept = rest.split(" (")
             dept = dept.replace(")", "")
             exam_type = st.selectbox("امتحان کی قسم", ["ماہانہ", "سہ ماہی", "سالانہ", "پارہ ٹیسٹ"])
-            para_no = 0
             start_date = st.date_input("تاریخ ابتدا", date.today())
             end_date = None
+            from_para = 0
+            to_para = 0
             if exam_type == "پارہ ٹیسٹ":
-                para_no = st.number_input("پارہ نمبر", 1, 30)
+                para = st.number_input("پارہ نمبر", min_value=1, max_value=30, value=1)
+                from_para = para
+                to_para = para
                 end_date = st.date_input("تاریخ اختتام", date.today() + timedelta(days=7))
+            else:
+                col1, col2 = st.columns(2)
+                from_para = col1.number_input("پارہ نمبر (شروع)", min_value=1, max_value=30, value=1)
+                to_para = col2.number_input("پارہ نمبر (اختتام)", min_value=from_para, max_value=30, value=min(from_para+4,30))
+                end_date = None  # صرف پارہ ٹیسٹ کے لیے اختتام کی تاریخ
             if st.form_submit_button("بھیجیں"):
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("INSERT INTO exams (s_name, f_name, dept, para_no, start_date, end_date, status, exam_type) VALUES (?,?,?,?,?,?,?,?)",
-                          (s_name, f_name, dept, para_no, start_date, end_date, "پینڈنگ", exam_type))
+                c.execute("INSERT INTO exams (s_name, f_name, dept, from_para, to_para, start_date, end_date, status, exam_type) VALUES (?,?,?,?,?,?,?,?,?)",
+                          (s_name, f_name, dept, from_para, to_para, start_date, end_date, "پینڈنگ", exam_type))
                 conn.commit()
                 conn.close()
                 st.success("درخواست بھیج دی گئی")
