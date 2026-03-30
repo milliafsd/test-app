@@ -418,18 +418,90 @@ def generate_timetable_html(df_timetable):
 st.set_page_config(page_title="جامعہ ملیہ اسلامیہ | سمارٹ ERP", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
 <style>
+   st.markdown("""
+<style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap');
     * { font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif; }
     body { direction: rtl; text-align: right; background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%); }
-    .stSidebar { background: linear-gradient(180deg, #1e5631 0%, #0b2b1a 100%); color: white; }
-    .stSidebar .stRadio label { color: white !important; font-weight: bold; }
-    .stButton > button { background: linear-gradient(90deg, #1e5631, #2e7d32); color: white; border-radius: 30px; border: none; padding: 0.5rem 1rem; font-weight: bold; transition: 0.3s; width: 100%; }
-    .stButton > button:hover { transform: scale(1.02); background: linear-gradient(90deg, #2e7d32, #1e5631); }
-    .main-header { text-align: center; background: linear-gradient(135deg, #f1f8e9, #d4e0c9); padding: 1rem; border-radius: 20px; margin-bottom: 1rem; border-bottom: 4px solid #1e5631; }
-    .report-card { background: white; border-radius: 15px; padding: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 1rem; }
-    .stTabs [data-baseweb="tab"] { border-radius: 30px; padding: 0.5rem 1rem; background-color: #e0e0e0; }
-    .stTabs [aria-selected="true"] { background: linear-gradient(90deg, #1e5631, #2e7d32); color: white; }
-    @media (max-width: 768px) { .stButton > button { padding: 0.4rem 0.8rem; font-size: 0.8rem; } .main-header h1 { font-size: 1.5rem; } }
+    
+    /* سائڈبار کا پس منظر گہرا سبز */
+    .stSidebar {
+        background: linear-gradient(180deg, #1e5631 0%, #0b2b1a 100%);
+        color: white;
+    }
+    
+    /* تمام سائڈبار ٹیکسٹ سفید */
+    .stSidebar * {
+        color: white !important;
+    }
+    
+    /* ریڈیو بٹن کے لیبل سفید اور بڑے فونٹ */
+    .stSidebar .stRadio label {
+        color: white !important;
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    
+    /* ریڈیو بٹن کے دائرے سفید */
+    .stSidebar .stRadio [role="radiogroup"] div {
+        color: white !important;
+    }
+    
+    /* سلیکٹ شدہ ریڈیو آئٹم کا پس منظر ہلکا سبز */
+    .stSidebar .stRadio [role="radiogroup"] div[data-baseweb="radio"]:hover {
+        background-color: #2e7d32;
+        border-radius: 5px;
+    }
+    
+    /* باقی بٹن */
+    .stButton > button {
+        background: linear-gradient(90deg, #1e5631, #2e7d32);
+        color: white;
+        border-radius: 30px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: bold;
+        transition: 0.3s;
+        width: 100%;
+    }
+    .stButton > button:hover {
+        transform: scale(1.02);
+        background: linear-gradient(90deg, #2e7d32, #1e5631);
+    }
+    
+    .main-header {
+        text-align: center;
+        background: linear-gradient(135deg, #f1f8e9, #d4e0c9);
+        padding: 1rem;
+        border-radius: 20px;
+        margin-bottom: 1rem;
+        border-bottom: 4px solid #1e5631;
+    }
+    .report-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1rem;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 30px;
+        padding: 0.5rem 1rem;
+        background-color: #e0e0e0;
+    }
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(90deg, #1e5631, #2e7d32);
+        color: white;
+    }
+    @media (max-width: 768px) {
+        .stButton > button {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+        .main-header h1 {
+            font-size: 1.5rem;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
