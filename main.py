@@ -414,13 +414,9 @@ def generate_timetable_html(df_timetable):
     """
     return html
 
-# ==================== 3. اسٹائلنگ ====================
+# ==================== 3. اسٹائلنگ (درست شدہ) ====================
 st.set_page_config(page_title="جامعہ ملیہ اسلامیہ | سمارٹ ERP", layout="wide", initial_sidebar_state="expanded")
-    st.markdown("""
-<style>
-   st.markdown("""
-<style>
-    st.markdown("""
+st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu&display=swap');
     * { font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif; }
