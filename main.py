@@ -416,7 +416,7 @@ def generate_timetable_html(df_timetable):
 
 # ==================== 3. اسٹائلنگ ====================
 st.set_page_config(page_title="جامعہ ملیہ اسلامیہ | سمارٹ ERP", layout="wide", initial_sidebar_state="expanded")
-st.markdown("""
+    st.markdown("""
 <style>
    st.markdown("""
 <style>
