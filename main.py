@@ -8,7 +8,7 @@ import os
 import hashlib
 
 # ==================== 1. ڈیٹا بیس سیٹ اپ ====================
-DB_NAME = 'jamia_millia_new.db'
+DB_NAME = 'jamia_millia_v1 (1) (1).db'
 
 def get_db_connection():
     return sqlite3.connect(DB_NAME, check_same_thread=False)
