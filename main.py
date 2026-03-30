@@ -193,22 +193,24 @@ def init_db():
         details TEXT
     )''')
     
-    conn.commit()
     # عملہ نگرانی و شکایات
-c.execute('''CREATE TABLE IF NOT EXISTS staff_monitoring (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    staff_name TEXT,
-    date DATE,
-    note_type TEXT,
-    description TEXT,
-    action_taken TEXT,
-    status TEXT,
-    created_by TEXT,
-    created_at DATETIME
-)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS staff_monitoring (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        staff_name TEXT,
+        date DATE,
+        note_type TEXT,
+        description TEXT,
+        action_taken TEXT,
+        status TEXT,
+        created_by TEXT,
+        created_at DATETIME
+    )''')
+    
+    conn.commit()
+    
     # ڈیفالٹ ایڈمن (پاسورڈ ہیش شدہ)
-        admin_hash = hash_password("jamia123")
-        admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
+    admin_hash = hash_password("jamia123")
+    admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
     if not admin_exists:
         c.execute("INSERT INTO teachers (name, password, dept) VALUES (?,?,?)", ("admin", admin_hash, "Admin"))
     conn.commit()
@@ -274,7 +276,13 @@ def generate_exam_result_card(exam_row):
             <p><b>تاریخ:</b> {exam_row['start_date']} تا {exam_row['end_date']}</p>
             <table>
                 <tr><th>سوال</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>کل</th></tr>
-                <tr><td>نمبر</td><td>{exam_row['q1']}</td><td>{exam_row['q2']}</td><td>{exam_row['q3']}</td><td>{exam_row['q4']}</td><td>{exam_row['q5']}</td><td>{exam_row['total']}</td></tr>
+                <tr><td style="text-align:center">{exam_row['q1']}</td>
+                <td>{exam_row['q2']}</td>
+                <td>{exam_row['q3']}</td>
+                <td>{exam_row['q4']}</td>
+                <td>{exam_row['q5']}</td>
+                <td>{exam_row['total']}</td>
+                </tr>
             </table>
             <p><b>گریڈ:</b> {exam_row['grade']}</p>
             <div class="footer">
@@ -464,7 +472,7 @@ if not st.session_state.logged_in:
 if st.session_state.user_type == "admin":
     menu = ["📊 ایڈمن ڈیش بورڈ", "📊 یومیہ تعلیمی رپورٹ", "🎓 امتحانی نظام", "📜 ماہانہ رزلٹ کارڈ",
             "📘 پارہ تعلیمی رپورٹ", "🕒 اساتذہ حاضری", "🏛️ رخصت کی منظوری",
-            "👥 یوزر مینجمنٹ", "📚 ٹائم ٹیبل مینجمنٹ", "🔑 پاسورڈ تبدیل کریں", "📋 عملہ نگرانی و شکایات"
+            "👥 یوزر مینجمنٹ", "📚 ٹائم ٹیبل مینجمنٹ", "🔑 پاسورڈ تبدیل کریں", "📋 عملہ نگرانی و شکایات",
             "📢 نوٹیفیکیشنز", "📈 تجزیہ و رپورٹس", "⚙️ بیک اپ & سیٹنگز"]
 else:
     menu = ["📝 روزانہ سبق اندراج", "🎓 امتحانی درخواست", "📩 رخصت کی درخواست",
@@ -530,6 +538,7 @@ if selected == "📊 ایڈمن ڈیش بورڈ" and st.session_state.user_type 
     col2.metric("کل اساتذہ", total_teachers)
     conn.close()
 
+# 8.2 یومیہ تعلیمی رپورٹ (مضبوط ورژن)
 elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
     st.header("📊 یومیہ تعلیمی رپورٹ (طلاب) - ترمیم، حذف، اضافہ")
     
@@ -560,7 +569,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
             select_parts.append("r_date as تاریخ")
         if 's_name' in hifz_cols:
             select_parts.append("s_name as نام")
-        # پہلے father_name، ورنہ f_name
         if 'father_name' in hifz_cols:
             select_parts.append("father_name as 'والد کا نام'")
         elif 'f_name' in hifz_cols:
@@ -658,7 +666,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         if st.button("💾 تمام تبدیلیاں محفوظ کریں"):
             conn = get_db_connection()
             c = conn.cursor()
-            # پرانے ریکارڈ حذف کریں
             if dept_filter in ["تمام", "حفظ"]:
                 del_query = "DELETE FROM hifz_records WHERE r_date BETWEEN ? AND ?"
                 del_params = [d1, d2]
@@ -677,7 +684,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
                     del_params_gen.append(dept_filter)
                 c.execute(del_query_gen, del_params_gen)
             
-            # نئے ریکارڈ داخل کریں
             for _, row in edited_df.iterrows():
                 if row.get('شعبہ') == 'حفظ':
                     mapping = {
@@ -801,7 +807,8 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
             st.download_button("ہسٹری CSV", convert_df_to_csv(hist), "exam_history.csv")
         else:
             st.info("کوئی مکمل شدہ امتحان نہیں")
-            
+
+# 8.4 عملہ نگرانی و شکایات (نیا فیچر)
 elif selected == "📋 عملہ نگرانی و شکایات" and st.session_state.user_type == "admin":
     st.header("📋 عملہ نگرانی و شکایات")
     
@@ -863,17 +870,14 @@ elif selected == "📋 عملہ نگرانی و شکایات" and st.session_sta
         else:
             st.dataframe(df, use_container_width=True)
             
-            # ڈاؤن لوڈ اور پرنٹ
             csv = convert_df_to_csv(df)
             st.download_button("📥 CSV ڈاؤن لوڈ کریں", csv, "staff_monitoring.csv", "text/csv")
             
-            # HTML رپورٹ
             html_report = generate_html_report(df, "عملہ نگرانی و شکایات رپورٹ")
             st.download_button("📥 HTML رپورٹ ڈاؤن لوڈ کریں", html_report, "staff_monitoring_report.html", "text/html")
             if st.button("🖨️ پرنٹ کریں"):
                 st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_report}`);w.print();</script>", height=0)
             
-            # حذف کرنے کا آپشن (اختیاری)
             with st.expander("⚠️ ریکارڈ حذف کریں"):
                 record_id = st.number_input("ریکارڈ ID درج کریں", min_value=1, step=1)
                 if st.button("حذف کریں"):
@@ -883,8 +887,8 @@ elif selected == "📋 عملہ نگرانی و شکایات" and st.session_sta
                     conn.close()
                     st.success("ریکارڈ حذف کر دیا گیا")
                     st.rerun()
-                    
-# 8.4 ماہانہ رزلٹ کارڈ
+
+# 8.5 ماہانہ رزلٹ کارڈ
 elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user_type == "admin":
     st.header("📜 ماہانہ رزلٹ کارڈ")
     conn = get_db_connection()
@@ -942,7 +946,7 @@ elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user
             if st.button("🖨️ پرنٹ کریں"):
                 st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
 
-# 8.5 پارہ تعلیمی رپورٹ
+# 8.6 پارہ تعلیمی رپورٹ
 elif selected == "📘 پارہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
     st.header("📘 پارہ تعلیمی رپورٹ")
     conn = get_db_connection()
@@ -966,7 +970,7 @@ elif selected == "📘 پارہ تعلیمی رپورٹ" and st.session_state.us
             if st.button("🖨️ پرنٹ کریں"):
                 st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
 
-# 8.6 اساتذہ حاضری (ایڈمن)
+# 8.7 اساتذہ حاضری (ایڈمن)
 elif selected == "🕒 اساتذہ حاضری" and st.session_state.user_type == "admin":
     st.header("اساتذہ حاضری ریکارڈ")
     conn = get_db_connection()
@@ -974,7 +978,7 @@ elif selected == "🕒 اساتذہ حاضری" and st.session_state.user_type =
     conn.close()
     st.dataframe(df, use_container_width=True)
 
-# 8.7 رخصت کی منظوری (ایڈمن)
+# 8.8 رخصت کی منظوری (ایڈمن)
 elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_type == "admin":
     st.header("رخصت کی منظوری")
     conn = get_db_connection()
@@ -1003,14 +1007,13 @@ elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_
                     conn.close()
                     st.rerun()
 
-# 8.8 یوزر مینجمنٹ (ایڈمن) - درست شدہ ورژن
+# 8.9 یوزر مینجمنٹ (ایڈمن) - درست شدہ ورژن
 elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type == "admin":
     st.header("👥 یوزر مینجمنٹ")
     tab1, tab2 = st.tabs(["اساتذہ", "طلبہ"])
     with tab1:
         st.subheader("موجودہ اساتذہ")
         conn = get_db_connection()
-        # صرف موجودہ کالمز کو منتخب کریں
         columns = ["id", "name", "password", "dept", "phone", "address", "id_card", "joining_date"]
         existing_cols = []
         for col in columns:
@@ -1145,7 +1148,7 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                     else:
                         st.error("نام، ولدیت، استاد اور شعبہ ضروری ہیں")
 
-# 8.9 ٹائم ٹیبل مینجمنٹ (ایڈمن)
+# 8.10 ٹائم ٹیبل مینجمنٹ (ایڈمن)
 elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.user_type == "admin":
     st.header("📚 ٹائم ٹیبل مینجمنٹ")
     conn = get_db_connection()
@@ -1201,7 +1204,7 @@ elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.us
                     conn.close()
                     st.rerun()
 
-# 8.10 پاسورڈ تبدیل کریں (ایڈمن اور استاد)
+# 8.11 پاسورڈ تبدیل کریں (ایڈمن اور استاد)
 elif selected == "🔑 پاسورڈ تبدیل کریں":
     st.header("🔑 پاسورڈ تبدیل کریں")
     if st.session_state.user_type == "admin":
@@ -1235,7 +1238,7 @@ elif selected == "🔑 پاسورڈ تبدیل کریں":
             else:
                 st.error("نیا پاسورڈ اور تصدیق ایک جیسی ہونی چاہیے")
 
-# 8.11 نوٹیفیکیشنز
+# 8.12 نوٹیفیکیشنز
 elif selected == "📢 نوٹیفیکیشنز":
     st.header("نوٹیفیکیشن سینٹر")
     if st.session_state.user_type == "admin":
@@ -1259,7 +1262,7 @@ elif selected == "📢 نوٹیفیکیشنز":
     for n in notifs:
         st.info(f"**{n[0]}**\n\n{n[1]}\n\n*{n[2]}*")
 
-# 8.12 تجزیہ و رپورٹس
+# 8.13 تجزیہ و رپورٹس
 elif selected == "📈 تجزیہ و رپورٹس" and st.session_state.user_type == "admin":
     st.header("تجزیہ")
     conn = get_db_connection()
@@ -1269,11 +1272,11 @@ elif selected == "📈 تجزیہ و رپورٹس" and st.session_state.user_typ
         st.plotly_chart(fig)
     conn.close()
 
-# 8.13 بیک اپ & سیٹنگز
+# 8.14 بیک اپ & سیٹنگز
 elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_type == "admin":
     st.header("بیک اپ اور سیٹنگز")
     if st.button("💾 ڈیٹا بیس کا بیک اپ لیں"):
-        tables = ["teachers", "students", "hifz_records", "general_education", "t_attendance", "exams", "passed_paras", "timetable", "leave_requests", "notifications", "audit_log"]
+        tables = ["teachers", "students", "hifz_records", "general_education", "t_attendance", "exams", "passed_paras", "timetable", "leave_requests", "notifications", "audit_log", "staff_monitoring"]
         conn = get_db_connection()
         for t in tables:
             try:
