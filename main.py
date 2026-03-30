@@ -194,7 +194,18 @@ def init_db():
     )''')
     
     conn.commit()
-    
+    # عملہ نگرانی و شکایات
+c.execute('''CREATE TABLE IF NOT EXISTS staff_monitoring (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    staff_name TEXT,
+    date DATE,
+    note_type TEXT,
+    description TEXT,
+    action_taken TEXT,
+    status TEXT,
+    created_by TEXT,
+    created_at DATETIME
+)''')
     # ڈیفالٹ ایڈمن (پاسورڈ ہیش شدہ)
     admin_hash = hash_password("jamia123")
     admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
@@ -790,7 +801,89 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
             st.download_button("ہسٹری CSV", convert_df_to_csv(hist), "exam_history.csv")
         else:
             st.info("کوئی مکمل شدہ امتحان نہیں")
-
+            
+elif selected == "📋 عملہ نگرانی و شکایات" and st.session_state.user_type == "admin":
+    st.header("📋 عملہ نگرانی و شکایات")
+    
+    tab1, tab2 = st.tabs(["➕ نیا اندراج", "📜 ریکارڈ دیکھیں"])
+    
+    with tab1:
+        with st.form("new_monitoring"):
+            conn = get_db_connection()
+            staff_list = [t[0] for t in conn.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
+            conn.close()
+            if not staff_list:
+                st.warning("کوئی استاد/عملہ موجود نہیں۔ پہلے اساتذہ رجسٹر کریں۔")
+            else:
+                staff_name = st.selectbox("عملہ کا نام", staff_list)
+                note_date = st.date_input("تاریخ", date.today())
+                note_type = st.selectbox("نوعیت", ["یادداشت", "شکایت", "تنبیہ", "تعریف", "کارکردگی جائزہ"])
+                description = st.text_area("تفصیل", height=150)
+                action_taken = st.text_area("کیا کارروائی کی گئی؟", height=100)
+                status = st.selectbox("حالت", ["زیر التواء", "حل شدہ", "زیر غور"])
+                if st.form_submit_button("محفوظ کریں"):
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("""INSERT INTO staff_monitoring 
+                                (staff_name, date, note_type, description, action_taken, status, created_by, created_at)
+                                VALUES (?,?,?,?,?,?,?,?)""",
+                              (staff_name, note_date, note_type, description, action_taken, status, st.session_state.username, datetime.now()))
+                    conn.commit()
+                    conn.close()
+                    log_audit(st.session_state.username, "Staff Monitoring Added", f"{staff_name} - {note_type}")
+                    st.success("اندراج محفوظ ہو گیا")
+                    st.rerun()
+    
+    with tab2:
+        st.subheader("فلٹرز")
+        conn = get_db_connection()
+        staff_names = ["تمام"] + [t[0] for t in conn.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
+        conn.close()
+        filter_staff = st.selectbox("عملہ فلٹر کریں", staff_names)
+        filter_type = st.selectbox("نوعیت فلٹر کریں", ["تمام", "یادداشت", "شکایت", "تنبیہ", "تعریف", "کارکردگی جائزہ"])
+        start_date = st.date_input("تاریخ از", date.today() - timedelta(days=30))
+        end_date = st.date_input("تاریخ تا", date.today())
+        
+        query = "SELECT id, staff_name as 'عملہ کا نام', date as تاریخ, note_type as نوعیت, description as تفصیل, action_taken as 'کارروائی', status as حالت, created_by as 'داخل کردہ', created_at as 'داخل کردہ تاریخ' FROM staff_monitoring WHERE date BETWEEN ? AND ?"
+        params = [start_date, end_date]
+        if filter_staff != "تمام":
+            query += " AND staff_name = ?"
+            params.append(filter_staff)
+        if filter_type != "تمام":
+            query += " AND note_type = ?"
+            params.append(filter_type)
+        query += " ORDER BY date DESC"
+        
+        conn = get_db_connection()
+        df = pd.read_sql_query(query, conn, params=params)
+        conn.close()
+        
+        if df.empty:
+            st.info("کوئی ریکارڈ موجود نہیں")
+        else:
+            st.dataframe(df, use_container_width=True)
+            
+            # ڈاؤن لوڈ اور پرنٹ
+            csv = convert_df_to_csv(df)
+            st.download_button("📥 CSV ڈاؤن لوڈ کریں", csv, "staff_monitoring.csv", "text/csv")
+            
+            # HTML رپورٹ
+            html_report = generate_html_report(df, "عملہ نگرانی و شکایات رپورٹ")
+            st.download_button("📥 HTML رپورٹ ڈاؤن لوڈ کریں", html_report, "staff_monitoring_report.html", "text/html")
+            if st.button("🖨️ پرنٹ کریں"):
+                st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_report}`);w.print();</script>", height=0)
+            
+            # حذف کرنے کا آپشن (اختیاری)
+            with st.expander("⚠️ ریکارڈ حذف کریں"):
+                record_id = st.number_input("ریکارڈ ID درج کریں", min_value=1, step=1)
+                if st.button("حذف کریں"):
+                    conn = get_db_connection()
+                    conn.execute("DELETE FROM staff_monitoring WHERE id=?", (record_id,))
+                    conn.commit()
+                    conn.close()
+                    st.success("ریکارڈ حذف کر دیا گیا")
+                    st.rerun()
+                    
 # 8.4 ماہانہ رزلٹ کارڈ
 elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user_type == "admin":
     st.header("📜 ماہانہ رزلٹ کارڈ")
