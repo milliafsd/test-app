@@ -1,4 +1,26 @@
 import streamlit as st
+import streamlit.components.v1 as components
+
+# PWA کے لیے ضروری میٹا ڈیٹا شامل کرنا
+components.html(
+    """
+    <link rel="manifest" href="/manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(registration) {
+            console.log('ServiceWorker registration successful');
+          }, function(err) {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+    """,
+    height=0,
+)
+
+import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
 import sqlite3
