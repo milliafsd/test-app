@@ -215,18 +215,6 @@ def init_db():
         created_by TEXT,
         created_at DATETIME
     )''')
-    
-    conn.commit()
-    
-    # ڈیفالٹ ایڈمن
-    admin_hash = hash_password("jamia123")
-    admin_exists = c.execute("SELECT 1 FROM teachers WHERE name='admin'").fetchone()
-    if not admin_exists:
-        c.execute("INSERT INTO teachers (name, password, dept) VALUES (?,?,?)", ("admin", admin_hash, "Admin"))
-    conn.commit()
-    conn.close()
-
-init_db()
 
 # ==================== 2. ہیلپر فنکشنز ====================
 def log_audit(user, action, details=""):
