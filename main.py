@@ -10,7 +10,7 @@ import shutil
 import zipfile
 import io
 
-# ==================== 1. ڈیٹا بیس سیٹ اپ (نیا ورژن - اسٹوڈنٹ آئی ڈی پر مبنی) ====================
+# ==================== 1. ڈیٹا بیس سیٹ اپ ====================
 DB_NAME = 'jamia_millia_data.db'
 
 def get_db_connection():
@@ -55,7 +55,7 @@ def init_db():
     add_column_if_not_exists('teachers', 'photo', 'TEXT')
     add_column_if_not_exists('teachers', 'joining_date', 'DATE')
     
-    # طلبہ ٹیبل (اب داخلی آئی ڈی استعمال ہوگی)
+    # طلبہ ٹیبل (اب internal ID خودکار)
     c.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -74,9 +74,8 @@ def init_db():
         class TEXT,
         section TEXT
     )''')
-    # پرانے ڈیٹا کو منتقل کرنے کے لیے کوئی کارروائی نہیں، بس ٹیبل موجود ہونا چاہیے
     
-    # حفظ ریکارڈ (اب student_id شامل)
+    # حفظ ریکارڈ (student_id پر مبنی)
     c.execute('''CREATE TABLE IF NOT EXISTS hifz_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         r_date DATE,
@@ -96,8 +95,6 @@ def init_db():
         lines INTEGER,
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
     )''')
-    # اگر پرانے کالم موجود ہیں (s_name, f_name) تو انہیں ہٹانا نہیں، بلکہ ڈیٹا مائیگریشن کے لیے رکھیں گے
-    # مائیگریشن: اگر student_id کالم نہیں ہے تو ڈالیں، پھر s_name/f_name کی بنیاد پر student_id پُر کریں
     add_column_if_not_exists('hifz_records', 'student_id', 'INTEGER')
     add_column_if_not_exists('hifz_records', 'lines', 'INTEGER')
     
@@ -245,24 +242,20 @@ def init_db():
     conn.commit()
     
     # ========== مائیگریشن: پرانے ریکارڈز کو student_id سے منسلک کریں ==========
-    # پہلے یقینی بنائیں کہ hifz_records میں s_name/f_name موجود ہیں
+    # صرف اس صورت میں جب پرانے کالم موجود ہوں (s_name, f_name)
     if column_exists('hifz_records', 's_name') and column_exists('hifz_records', 'f_name'):
-        # ان ریکارڈز کے لیے جن میں student_id نہیں ہے
         c.execute("SELECT id, s_name, f_name FROM hifz_records WHERE student_id IS NULL")
         old_records = c.fetchall()
         for rec_id, s_name, f_name in old_records:
-            # طالب علم کی آئی ڈی معلوم کریں
             student = c.execute("SELECT id FROM students WHERE name=? AND father_name=?", (s_name, f_name)).fetchone()
             if student:
                 c.execute("UPDATE hifz_records SET student_id=? WHERE id=?", (student[0], rec_id))
             else:
-                # اگر طالب علم موجود نہیں تو ایک نیا طالب علم بنائیں (عارضی)
                 c.execute("INSERT INTO students (name, father_name) VALUES (?,?)", (s_name, f_name))
                 new_id = c.lastrowid
                 c.execute("UPDATE hifz_records SET student_id=? WHERE id=?", (new_id, rec_id))
         conn.commit()
     
-    # اسی طرح qaida_records کے لیے
     if column_exists('qaida_records', 's_name') and column_exists('qaida_records', 'f_name'):
         c.execute("SELECT id, s_name, f_name FROM qaida_records WHERE student_id IS NULL")
         old_records = c.fetchall()
@@ -276,7 +269,6 @@ def init_db():
                 c.execute("UPDATE qaida_records SET student_id=? WHERE id=?", (new_id, rec_id))
         conn.commit()
     
-    # general_education کے لیے
     if column_exists('general_education', 's_name') and column_exists('general_education', 'f_name'):
         c.execute("SELECT id, s_name, f_name FROM general_education WHERE student_id IS NULL")
         old_records = c.fetchall()
@@ -290,7 +282,6 @@ def init_db():
                 c.execute("UPDATE general_education SET student_id=? WHERE id=?", (new_id, rec_id))
         conn.commit()
     
-    # exams کے لیے (اگر s_name/f_name موجود ہوں)
     if column_exists('exams', 's_name') and column_exists('exams', 'f_name'):
         c.execute("SELECT id, s_name, f_name FROM exams WHERE student_id IS NULL")
         old_records = c.fetchall()
@@ -304,7 +295,6 @@ def init_db():
                 c.execute("UPDATE exams SET student_id=? WHERE id=?", (new_id, rec_id))
         conn.commit()
     
-    # passed_paras کے لیے
     if column_exists('passed_paras', 's_name') and column_exists('passed_paras', 'f_name'):
         c.execute("SELECT id, s_name, f_name FROM passed_paras WHERE student_id IS NULL")
         old_records = c.fetchall()
@@ -381,7 +371,7 @@ def generate_exam_result_card(exam_row):
             <p><b>کل دن:</b> {exam_row.get('total_days', '')}</p>
             <table>
                 <tr><th>سوال</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>کل</th></tr>
-                <td><td style="text-align:center">{exam_row['q1']}</td>
+                <tr><td style="text-align:center">{exam_row['q1']}</td>
                 <td>{exam_row['q2']}</td>
                 <td>{exam_row['q3']}</td>
                 <td>{exam_row['q4']}</td>
@@ -655,7 +645,7 @@ if selected == "📊 ایڈمن ڈیش بورڈ" and st.session_state.user_type 
     col2.metric("کل اساتذہ", total_teachers)
     conn.close()
 
-# 8.2 یومیہ تعلیمی رپورٹ (اب student_id کی بنیاد پر جوائن کر کے نام لائیں گے)
+# 8.2 یومیہ تعلیمی رپورٹ
 elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
     st.header("📊 یومیہ تعلیمی رپورٹ - ترمیم، حذف، اضافہ")
     
@@ -745,18 +735,13 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         st.warning("کوئی ریکارڈ نہیں ملا")
     else:
         st.success(f"کل {len(combined_df)} ریکارڈ ملے")
-        edited_df = st.data_editor(combined_df, num_rows="dynamic", use_container_width=True, key="daily_editor")
-        if st.button("💾 تمام تبدیلیاں محفوظ کریں"):
-            # یہاں ترمیم شدہ ڈیٹا کو واپس ڈیٹا بیس میں ڈالنے کے لیے پیچیدہ کوڈ ہے
-            # چونکہ ہم نے student_id استعمال کیا ہے، اس لیے نام تبدیل کرنے سے پرانے ریکارڈ متاثر نہیں ہوں گے
-            # ہم صرف یہاں پر ایک پیغام دکھا کر کہیں گے کہ براہ راست ترمیم صرف ایڈمن کے ذریعے ممکن ہے
-            st.warning("براہ کرم تبدیلیاں براہ راست ڈیٹا بیس میں نہ کریں۔ یومیہ رپورٹ صرف دیکھنے کے لیے ہے۔ اگر آپ کوئی ترمیم چاہتے ہیں تو یوزر مینجمنٹ یا اندراج والے سیکشن استعمال کریں۔")
+        st.dataframe(combined_df, use_container_width=True)
         html_report = generate_html_report(combined_df, "یومیہ تعلیمی رپورٹ", start_date=d1.strftime("%Y-%m-%d"), end_date=d2.strftime("%Y-%m-%d"))
         st.download_button("📥 HTML رپورٹ ڈاؤن لوڈ کریں", html_report, "daily_report.html", "text/html")
         if st.button("🖨️ پرنٹ کریں"):
             st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_report}`);w.print();</script>", height=0)
 
-# 8.3 امتحانی نظام (اب student_id پر مبنی)
+# 8.3 امتحانی نظام
 elif selected == "🎓 امتحانی نظام" and st.session_state.user_type == "admin":
     st.header("🎓 امتحانی نظام")
     tab1, tab2 = st.tabs(["پینڈنگ امتحانات", "مکمل شدہ"])
@@ -801,16 +786,14 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
                         c.execute("""UPDATE exams SET q1=?, q2=?, q3=?, q4=?, q5=?, total=?, grade=?, status=?, end_date=? WHERE id=?""",
                                   (q1,q2,q3,q4,q5,total,g,"مکمل", date.today(), eid))
                         if g != "ناکام":
+                            stud_id = c.execute("SELECT student_id FROM exams WHERE id=?", (eid,)).fetchone()[0]
                             if etype == "پارہ ٹیسٹ" and fp:
                                 for para in range(fp, tp+1):
-                                    # student_id حاصل کریں
-                                    stud_id = c.execute("SELECT student_id FROM exams WHERE id=?", (eid,)).fetchone()[0]
                                     existing = c.execute("SELECT 1 FROM passed_paras WHERE student_id=? AND para_no=?", (stud_id, para)).fetchone()
                                     if not existing:
                                         c.execute("INSERT INTO passed_paras (student_id, para_no, passed_date, exam_type, grade, marks) VALUES (?,?,?,?,?,?)",
                                                   (stud_id, para, date.today(), etype, g, total))
                             else:
-                                stud_id = c.execute("SELECT student_id FROM exams WHERE id=?", (eid,)).fetchone()[0]
                                 existing = c.execute("SELECT 1 FROM passed_paras WHERE student_id=? AND book_name=?", (stud_id, book)).fetchone()
                                 if not existing:
                                     c.execute("INSERT INTO passed_paras (student_id, book_name, passed_date, exam_type, grade, marks) VALUES (?,?,?,?,?,?)",
@@ -835,7 +818,7 @@ elif selected == "🎓 امتحانی نظام" and st.session_state.user_type =
         else:
             st.info("کوئی مکمل شدہ امتحان نہیں")
 
-# 8.4 عملہ نگرانی و شکایات (پہلے جیسا - مختصر)
+# 8.4 عملہ نگرانی و شکایات (مختصر)
 elif selected == "📋 عملہ نگرانی و شکایات" and st.session_state.user_type == "admin":
     st.header("📋 عملہ نگرانی و شکایات")
     tab1, tab2 = st.tabs(["➕ نیا اندراج", "📜 ریکارڈ دیکھیں"])
@@ -906,7 +889,7 @@ elif selected == "📋 عملہ نگرانی و شکایات" and st.session_sta
                     st.success("ریکارڈ حذف کر دیا گیا")
                     st.rerun()
 
-# 8.5 ماہانہ رزلٹ کارڈ (اب student_id پر مبنی)
+# 8.5 ماہانہ رزلٹ کارڈ
 elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user_type == "admin":
     st.header("📜 ماہانہ رزلٹ کارڈ")
     conn = get_db_connection()
@@ -922,7 +905,6 @@ elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user
         dept = dept.replace(")", "")
         start = st.date_input("تاریخ آغاز", date.today().replace(day=1))
         end = st.date_input("تاریخ اختتام", date.today())
-        # student_id حاصل کریں
         student_id = [s[0] for s in students_list if s[1] == s_name and s[2] == f_name][0]
         
         if dept == "حفظ":
@@ -980,7 +962,7 @@ elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user
             if st.button("🖨️ پرنٹ کریں"):
                 st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
 
-# 8.6 پارہ تعلیمی رپورٹ (اب student_id پر مبنی)
+# 8.6 پارہ تعلیمی رپورٹ
 elif selected == "📘 پارہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
     st.header("📘 پارہ تعلیمی رپورٹ")
     conn = get_db_connection()
@@ -1008,7 +990,7 @@ elif selected == "📘 پارہ تعلیمی رپورٹ" and st.session_state.us
             if st.button("🖨️ پرنٹ کریں"):
                 st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
 
-# 8.7 اساتذہ حاضری (پہلے جیسا)
+# 8.7 اساتذہ حاضری
 elif selected == "🕒 اساتذہ حاضری" and st.session_state.user_type == "admin":
     st.header("اساتذہ حاضری ریکارڈ")
     conn = get_db_connection()
@@ -1016,7 +998,7 @@ elif selected == "🕒 اساتذہ حاضری" and st.session_state.user_type =
     conn.close()
     st.dataframe(df, use_container_width=True)
 
-# 8.8 رخصت کی منظوری (پہلے جیسا)
+# 8.8 رخصت کی منظوری
 elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_type == "admin":
     st.header("رخصت کی منظوری")
     conn = get_db_connection()
@@ -1045,7 +1027,7 @@ elif selected == "🏛️ رخصت کی منظوری" and st.session_state.user_
                     conn.close()
                     st.rerun()
 
-# 8.9 یوزر مینجمنٹ (طلبہ کی تبدیلی پر پرانا ریکارڈ محفوظ رہے گا کیونکہ student_id استعمال ہو رہا ہے)
+# 8.9 یوزر مینجمنٹ
 elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type == "admin":
     st.header("👥 یوزر مینجمنٹ")
     tab1, tab2 = st.tabs(["اساتذہ", "طلبہ"])
@@ -1108,7 +1090,7 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                     else:
                         st.error("نام اور پاسورڈ ضروری ہیں")
     with tab2:
-        st.subheader("موجودہ طلبہ (نام/والد نام تبدیل کرنے سے پرانا ریکارڈ متاثر نہیں ہوگا)")
+        st.subheader("موجودہ طلبہ")
         conn = get_db_connection()
         columns = ["id", "name", "father_name", "mother_name", "dob", "admission_date", "exit_date", "exit_reason",
                    "id_card", "phone", "address", "teacher_name", "dept", "class", "section"]
@@ -1124,9 +1106,8 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
             if st.button("طلبہ میں تبدیلیاں محفوظ کریں"):
                 conn = get_db_connection()
                 c = conn.cursor()
-                # ہر طالب علم کے لیے صرف نام اور دیگر فیلڈز اپ ڈیٹ کریں، id کو تبدیل نہ کریں
+                # UPDATE کا استعمال کریں تاکہ id تبدیل نہ ہو اور پرانے ریکارڈ منسلک رہیں
                 for _, row in edited_students.iterrows():
-                    # UPDATE کا استعمال کریں تاکہ id تبدیل نہ ہو
                     c.execute("""UPDATE students SET 
                                 name=?, father_name=?, mother_name=?, dob=?, admission_date=?, exit_date=?, exit_reason=?,
                                 id_card=?, phone=?, address=?, teacher_name=?, dept=?, class=?, section=?
@@ -1136,7 +1117,6 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                                row['teacher_name'], row['dept'], row['class'], row['section'], row['id']))
                 conn.commit()
                 conn.close()
-                log_audit(st.session_state.username, "Students Updated (using UPDATE)")
                 st.success("تبدیلیاں محفوظ ہو گئیں (پرانا ریکارڈ برقرار ہے)")
                 st.rerun()
         else:
@@ -1193,7 +1173,7 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                     else:
                         st.error("نام، ولدیت، استاد اور شعبہ ضروری ہیں")
 
-# 8.10 ٹائم ٹیبل مینجمنٹ (پہلے جیسا - مختصر)
+# 8.10 ٹائم ٹیبل مینجمنٹ (مختصر)
 elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.user_type == "admin":
     st.header("📚 ٹائم ٹیبل مینجمنٹ")
     conn = get_db_connection()
@@ -1249,7 +1229,7 @@ elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.us
                     conn.close()
                     st.rerun()
 
-# 8.11 پاسورڈ تبدیل کریں (پہلے جیسا)
+# 8.11 پاسورڈ تبدیل کریں
 elif selected == "🔑 پاسورڈ تبدیل کریں":
     st.header("🔑 پاسورڈ تبدیل کریں")
     if st.session_state.user_type == "admin":
@@ -1283,7 +1263,7 @@ elif selected == "🔑 پاسورڈ تبدیل کریں":
             else:
                 st.error("نیا پاسورڈ اور تصدیق ایک جیسی ہونی چاہیے")
 
-# 8.12 نوٹیفیکیشنز (پہلے جیسا)
+# 8.12 نوٹیفیکیشنز
 elif selected == "📢 نوٹیفیکیشنز":
     st.header("نوٹیفیکیشن سینٹر")
     if st.session_state.user_type == "admin":
@@ -1307,7 +1287,7 @@ elif selected == "📢 نوٹیفیکیشنز":
     for n in notifs:
         st.info(f"**{n[0]}**\n\n{n[1]}\n\n*{n[2]}*")
 
-# 8.13 تجزیہ و رپورٹس (پہلے جیسا)
+# 8.13 تجزیہ و رپورٹس
 elif selected == "📈 تجزیہ و رپورٹس" and st.session_state.user_type == "admin":
     st.header("تجزیہ")
     conn = get_db_connection()
@@ -1317,7 +1297,7 @@ elif selected == "📈 تجزیہ و رپورٹس" and st.session_state.user_typ
         st.plotly_chart(fig)
     conn.close()
 
-# 8.14 بیک اپ & سیٹنگز (پہلے جیسا)
+# 8.14 بیک اپ & سیٹنگز
 elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_type == "admin":
     st.header("بیک اپ اور سیٹنگز")
     st.subheader("📥 مکمل ڈیٹا بیس بیک اپ")
@@ -1339,7 +1319,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         confirm = st.checkbox("میں سمجھ گیا ہوں کہ موجودہ ڈیٹا ختم ہو جائے گا")
         if confirm and st.button("ریسٹور کریں"):
             if os.path.exists(DB_NAME):
-                shutil.copy(DB_NAME, f"{DB_NAME}_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
+                shutil.copy(DB_NAME, f"{DB_NAME}_before_restore_{datetime.now().strftime('%Y%m%d%H%M%S')}.db")
             with open(DB_NAME, "wb") as f:
                 f.write(uploaded_file.getbuffer())
             st.success("ڈیٹا بیس ریسٹور کر دیا گیا۔ براہ کرم ایپ کو دوبارہ چلائیں (ری لوڈ کریں)۔")
@@ -1363,7 +1343,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         st.download_button(
             label="📥 CSV بیک اپ زپ ڈاؤن لوڈ کریں",
             data=zip_buffer,
-            file_name=f"backup_tables_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+            file_name=f"backup_tables_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip",
             mime="application/zip"
         )
     with st.expander("آڈٹ لاگ"):
@@ -1373,7 +1353,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         st.dataframe(logs)
 
 # ==================== 9. استاد کے سیکشن ====================
-# 9.1 روزانہ سبق اندراج (اب student_id کے ساتھ)
+# 9.1 روزانہ سبق اندراج (مکمل)
 if selected == "📝 روزانہ سبق اندراج" and st.session_state.user_type == "teacher":
     st.header("📝 روزانہ سبق اندراج")
     entry_date = st.date_input("تاریخ (جس دن کا اندراج کرنا ہے)", date.today())
@@ -1600,7 +1580,7 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                     conn.close()
                     st.success("محفوظ ہو گیا")
 
-# 9.2 امتحانی درخواست (استاد) - اب student_id پر مبنی
+# 9.2 امتحانی درخواست
 elif selected == "🎓 امتحانی درخواست" and st.session_state.user_type == "teacher":
     st.subheader("امتحان کے لیے طالب علم نامزد کریں")
     conn = get_db_connection()
@@ -1650,7 +1630,7 @@ elif selected == "🎓 امتحانی درخواست" and st.session_state.user_
                 conn.close()
                 st.success("درخواست بھیج دی گئی")
 
-# 9.3 رخصت کی درخواست (استاد) - پہلے جیسا
+# 9.3 رخصت کی درخواست
 elif selected == "📩 رخصت کی درخواست" and st.session_state.user_type == "teacher":
     st.header("📩 رخصت کی درخواست")
     with st.form("leave_request_form"):
@@ -1675,7 +1655,7 @@ elif selected == "📩 رخصت کی درخواست" and st.session_state.user_t
             else:
                 st.error("براہ کرم وجہ تحریر کریں")
 
-# 9.4 میری حاضری (استاد) - پہلے جیسا
+# 9.4 میری حاضری
 elif selected == "🕒 میری حاضری" and st.session_state.user_type == "teacher":
     st.header("🕒 میری حاضری")
     today = date.today()
@@ -1710,7 +1690,7 @@ elif selected == "🕒 میری حاضری" and st.session_state.user_type == "t
     else:
         st.success(f"آمد: {rec[0]} | رخصت: {rec[1]}")
 
-# 9.5 میرا ٹائم ٹیبل (استاد) - پہلے جیسا
+# 9.5 میرا ٹائم ٹیبل
 elif selected == "📚 میرا ٹائم ٹیبل" and st.session_state.user_type == "teacher":
     st.header("📚 میرا ٹائم ٹیبل")
     conn = get_db_connection()
