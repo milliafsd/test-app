@@ -115,7 +115,7 @@ def init_db():
     )''')
     add_column_if_not_exists('qaida_records', 'student_id', 'INTEGER')
     
-    # عمومی تعلیم
+    # عمومی تعلیم (اب attendance کالم شامل)
     c.execute('''CREATE TABLE IF NOT EXISTS general_education (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         r_date DATE,
@@ -130,6 +130,7 @@ def init_db():
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
     )''')
     add_column_if_not_exists('general_education', 'student_id', 'INTEGER')
+    add_column_if_not_exists('general_education', 'attendance', 'TEXT')
     
     # اساتذہ حاضری
     c.execute('''CREATE TABLE IF NOT EXISTS t_attendance (
@@ -647,9 +648,9 @@ if selected == "📊 ایڈمن ڈیش بورڈ" and st.session_state.user_type 
     col2.metric("کل اساتذہ", total_teachers)
     conn.close()
 
-# 8.2 یومیہ تعلیمی رپورٹ
+# 8.2 یومیہ تعلیمی رپورٹ (محفوظ ورژن - کوئی ڈیلیٹ نہیں)
 elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
-    st.header("📊 یومیہ تعلیمی رپورٹ - ترمیم، حذف، اضافہ")
+    st.header("📊 یومیہ تعلیمی رپورٹ - صرف دیکھیں (تبدیلی کے لیے یوزر مینجمنٹ استعمال کریں)")
     
     with st.sidebar:
         d1 = st.date_input("تاریخ آغاز", date.today().replace(day=1))
@@ -709,44 +710,45 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         except Exception as e:
             st.error(f"قاعدہ کے ریکارڈ لوڈ کرتے وقت خرابی: {str(e)}")
     
- # درسِ نظامی اور عصری تعلیم (صرف موجودہ کالمز کے ساتھ)
-if dept_filter in ["تمام", "درسِ نظامی", "عصری تعلیم"]:
-    conn = get_db_connection()
-    # پہلے چیک کریں کہ general_education میں کون سے کالم موجود ہیں
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(general_education)")
-    existing_cols = [row[1] for row in cursor.fetchall()]
-    
-    select_parts = ["g.r_date as تاریخ", "s.name as نام", "s.father_name as 'والد کا نام'", "s.roll_no as 'شناختی نمبر'", "g.t_name as استاد", "g.dept as شعبہ", "g.book_subject as 'کتاب/مضمون'", "g.today_lesson as 'آج کا سبق'", "g.homework as 'ہوم ورک'", "g.performance as کارکردگی"]
-    # اگر attendance کالم موجود ہے تو شامل کریں
-    if 'attendance' in existing_cols:
-        select_parts.append("g.attendance as حاضری")
-    else:
-        select_parts.append("'' as حاضری")  # خالی کالم
-        
-    query = f"""
-        SELECT {', '.join(select_parts)}
-        FROM general_education g
-        JOIN students s ON g.student_id = s.id
-        WHERE g.r_date BETWEEN ? AND ?
-    """
-    params = [d1, d2]
-    if sel_teacher != "تمام":
-        query += " AND g.t_name = ?"
-        params.append(sel_teacher)
-    if dept_filter != "تمام":
-        query += " AND g.dept = ?"
-        params.append(dept_filter)
-    
-    try:
-        gen_df = pd.read_sql_query(query, conn, params=params)
-        conn.close()
-        if not gen_df.empty:
-            gen_df['کل_غلطیاں'] = ''
-            gen_df['درجہ'] = ''
-            combined_df = pd.concat([combined_df, gen_df], ignore_index=True)
-    except Exception as e:
-        st.error(f"عمومی تعلیم کے ریکارڈ لوڈ کرتے وقت خرابی: {str(e)}")
+    # درسِ نظامی اور عصری (اب attendance کالم چیک کے ساتھ)
+    if dept_filter in ["تمام", "درسِ نظامی", "عصری تعلیم"]:
+        conn = get_db_connection()
+        # پہلے چیک کریں کہ general_education میں attendance کالم موجود ہے یا نہیں
+        has_attendance = column_exists('general_education', 'attendance')
+        if has_attendance:
+            select_cols = """
+                g.r_date as تاریخ, s.name as نام, s.father_name as 'والد کا نام', s.roll_no as 'شناختی نمبر', g.t_name as استاد,
+                g.dept as شعبہ, g.book_subject as 'کتاب/مضمون', g.today_lesson as 'آج کا سبق',
+                g.homework as 'ہوم ورک', g.performance as کارکردگی, g.attendance as حاضری
+            """
+        else:
+            select_cols = """
+                g.r_date as تاریخ, s.name as نام, s.father_name as 'والد کا نام', s.roll_no as 'شناختی نمبر', g.t_name as استاد,
+                g.dept as شعبہ, g.book_subject as 'کتاب/مضمون', g.today_lesson as 'آج کا سبق',
+                g.homework as 'ہوم ورک', g.performance as کارکردگی, '' as حاضری
+            """
+        query = f"""
+            SELECT {select_cols}
+            FROM general_education g
+            JOIN students s ON g.student_id = s.id
+            WHERE g.r_date BETWEEN ? AND ?
+        """
+        params = [d1, d2]
+        if sel_teacher != "تمام":
+            query += " AND g.t_name = ?"
+            params.append(sel_teacher)
+        if dept_filter != "تمام":
+            query += " AND g.dept = ?"
+            params.append(dept_filter)
+        try:
+            gen_df = pd.read_sql_query(query, conn, params=params)
+            conn.close()
+            if not gen_df.empty:
+                gen_df['کل_غلطیاں'] = ''
+                gen_df['درجہ'] = ''
+                combined_df = pd.concat([combined_df, gen_df], ignore_index=True)
+        except Exception as e:
+            st.error(f"عمومی تعلیم کے ریکارڈ لوڈ کرتے وقت خرابی: {str(e)}")
     
     if combined_df.empty:
         st.warning("کوئی ریکارڈ نہیں ملا")
