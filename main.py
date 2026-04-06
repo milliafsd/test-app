@@ -319,7 +319,7 @@ def init_db():
     conn.close()
 
 init_db()
-
+I 
 # ==================== 2. ہیلپر فنکشنز ====================
 def log_audit(user, action, details=""):
     try:
@@ -1318,9 +1318,11 @@ elif selected == "📈 تجزیہ و رپورٹس" and st.session_state.user_typ
         st.plotly_chart(fig)
     conn.close()
 
-# 8.14 بیک اپ & سیٹنگز
+# 8.14 بیک اپ & سیٹنگز (اب CSV اپ لوڈ کی سہولت کے ساتھ)
 elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_type == "admin":
     st.header("بیک اپ اور سیٹنگز")
+    
+    # ========== 1. مکمل ڈیٹا بیس بیک اپ (DB فائل) ==========
     st.subheader("📥 مکمل ڈیٹا بیس بیک اپ")
     if os.path.exists(DB_NAME):
         with open(DB_NAME, "rb") as f:
@@ -1332,20 +1334,26 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
             )
     else:
         st.warning("ڈیٹا بیس فائل موجود نہیں")
+    
     st.markdown("---")
-    st.subheader("🔄 ڈیٹا بیس ریسٹور کریں")
+    
+    # ========== 2. ڈیٹا بیس ریسٹور (DB فائل اپ لوڈ) ==========
+    st.subheader("🔄 ڈیٹا بیس ریسٹور کریں (پوری .db فائل)")
     st.warning("⚠️ احتیاط: موجودہ ڈیٹا ختم ہو جائے گا! پہلے بیک اپ ضرور لیں۔")
-    uploaded_file = st.file_uploader("پہلے سے محفوظ کردہ .db فائل منتخب کریں", type=["db"])
-    if uploaded_file is not None:
+    uploaded_db = st.file_uploader("پہلے سے محفوظ کردہ .db فائل منتخب کریں", type=["db"], key="db_upload")
+    if uploaded_db is not None:
         confirm = st.checkbox("میں سمجھ گیا ہوں کہ موجودہ ڈیٹا ختم ہو جائے گا")
-        if confirm and st.button("ریسٹور کریں"):
+        if confirm and st.button("ریسٹور کریں (پوری ڈیٹا بیس)"):
             if os.path.exists(DB_NAME):
                 shutil.copy(DB_NAME, f"{DB_NAME}_before_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
             with open(DB_NAME, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+                f.write(uploaded_db.getbuffer())
             st.success("ڈیٹا بیس ریسٹور کر دیا گیا۔ براہ کرم ایپ کو دوبارہ چلائیں (ری لوڈ کریں)۔")
             st.rerun()
+    
     st.markdown("---")
+    
+    # ========== 3. CSV فائلوں کا بیک اپ (زپ میں ڈاؤن لوڈ) ==========
     st.subheader("📄 CSV فائلوں کا بیک اپ (زپ میں ڈاؤن لوڈ)")
     if st.button("💾 تمام ٹیبلز کی CSV بیک اپ (زپ) بنائیں"):
         tables = ["teachers", "students", "hifz_records", "qaida_records", "general_education", "t_attendance", "exams", "passed_paras", "timetable", "leave_requests", "notifications", "audit_log", "staff_monitoring"]
@@ -1367,12 +1375,216 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
             file_name=f"backup_tables_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
             mime="application/zip"
         )
+    
+    st.markdown("---")
+    
+    # ========== 4. CSV فائل اپ لوڈ کر کے ریسٹور کریں (نیا فیچر) ==========
+    st.subheader("📤 CSV فائل اپ لوڈ کر کے ڈیٹا ریسٹور کریں")
+    st.info("یہاں آپ کسی ایک ٹیبل کی CSV فائل (پہلے بنائی گئی) اپ لوڈ کر سکتے ہیں۔ ڈیٹا خود بخود متعلقہ ٹیبل میں شامل ہو جائے گا۔")
+    
+    # ٹیبل منتخب کریں
+    table_options = {
+        "اساتذہ (teachers)": "teachers",
+        "طلبہ (students)": "students",
+        "حفظ ریکارڈ (hifz_records)": "hifz_records",
+        "قاعدہ ریکارڈ (qaida_records)": "qaida_records",
+        "عمومی تعلیم (general_education)": "general_education",
+        "امتحانات (exams)": "exams",
+        "پاس شدہ پارے (passed_paras)": "passed_paras",
+        "ٹائم ٹیبل (timetable)": "timetable",
+        "رخصت درخواستیں (leave_requests)": "leave_requests",
+        "نوٹیفیکیشنز (notifications)": "notifications",
+        "عملہ نگرانی (staff_monitoring)": "staff_monitoring"
+    }
+    selected_table_display = st.selectbox("ٹیبل منتخب کریں", list(table_options.keys()))
+    selected_table = table_options[selected_table_display]
+    
+    uploaded_csv = st.file_uploader("CSV فائل منتخب کریں (UTF-8 encoding)", type=["csv"], key="csv_upload")
+    
+    if uploaded_csv is not None:
+        try:
+            df = pd.read_csv(uploaded_csv)
+            st.write("اپ لوڈ کی گئی CSV میں پہلی 5 قطاریں:")
+            st.dataframe(df.head())
+            
+            # اپ لوڈ موڈ منتخب کریں
+            upload_mode = st.radio("اپ لوڈ موڈ:", ["موجودہ ڈیٹا میں شامل کریں (Append)", "موجودہ ڈیٹا کو حذف کر کے نیا ڈالیں (Replace)"])
+            
+            if st.button("ڈیٹا ریسٹور کریں"):
+                conn = get_db_connection()
+                c = conn.cursor()
+                
+                # اگر Replace موڈ ہے تو پہلے ٹیبل خالی کریں
+                if upload_mode == "موجودہ ڈیٹا کو حذف کر کے نیا ڈالیں (Replace)":
+                    c.execute(f"DELETE FROM {selected_table}")
+                    st.warning(f"{selected_table_display} کا پرانا ڈیٹا حذف کر دیا گیا۔")
+                
+                # اب نئی قطاریں داخل کریں
+                # ہر ٹیبل کے لیے الگ الگ منطق (خاص طور پر student_id والے ٹیبلز کے لیے)
+                if selected_table == "students":
+                    # طلبہ ٹیبل میں براہ راست داخلہ (id خودکار)
+                    for _, row in df.iterrows():
+                        c.execute("""
+                            INSERT INTO students (name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
+                                                  id_card, phone, address, teacher_name, dept, class, section, roll_no)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        """, (
+                            row.get('name', ''), row.get('father_name', ''), row.get('mother_name', ''),
+                            row.get('dob', None), row.get('admission_date', None), row.get('exit_date', None),
+                            row.get('exit_reason', ''), row.get('id_card', ''), row.get('phone', ''),
+                            row.get('address', ''), row.get('teacher_name', ''), row.get('dept', ''),
+                            row.get('class', ''), row.get('section', ''), row.get('roll_no', '')
+                        ))
+                
+                elif selected_table == "teachers":
+                    for _, row in df.iterrows():
+                        c.execute("""
+                            INSERT INTO teachers (name, password, dept, phone, address, id_card, photo, joining_date)
+                            VALUES (?,?,?,?,?,?,?,?)
+                        """, (
+                            row.get('name', ''), row.get('password', ''), row.get('dept', ''),
+                            row.get('phone', ''), row.get('address', ''), row.get('id_card', ''),
+                            row.get('photo', ''), row.get('joining_date', None)
+                        ))
+                
+                elif selected_table == "hifz_records":
+                    # حفظ ریکارڈ میں student_id کی ضرورت ہوتی ہے
+                    # اگر CSV میں student_id موجود ہے تو براہ راست استعمال کریں، ورنہ نام سے تلاش کریں
+                    for _, row in df.iterrows():
+                        student_id = None
+                        if 'student_id' in row and pd.notna(row['student_id']):
+                            student_id = int(row['student_id'])
+                        else:
+                            # نام اور والد کے نام سے طالب علم تلاش کریں
+                            s_name = row.get('s_name', '')
+                            f_name = row.get('f_name', '')
+                            if s_name and f_name:
+                                stu = c.execute("SELECT id FROM students WHERE name=? AND father_name=?", (s_name, f_name)).fetchone()
+                                if stu:
+                                    student_id = stu[0]
+                                else:
+                                    # اگر طالب علم موجود نہیں تو نیا بنائیں (صرف نام اور والد کا نام)
+                                    c.execute("INSERT INTO students (name, father_name) VALUES (?,?)", (s_name, f_name))
+                                    student_id = c.lastrowid
+                        if student_id:
+                            c.execute("""
+                                INSERT INTO hifz_records 
+                                (r_date, student_id, t_name, surah, a_from, a_to, sq_p, sq_a, sq_m, m_p, m_a, m_m, attendance, lines)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            """, (
+                                row.get('r_date', None), student_id, row.get('t_name', ''),
+                                row.get('surah', ''), row.get('a_from', ''), row.get('a_to', ''),
+                                row.get('sq_p', ''), row.get('sq_a', 0), row.get('sq_m', 0),
+                                row.get('m_p', ''), row.get('m_a', 0), row.get('m_m', 0),
+                                row.get('attendance', 'حاضر'), row.get('lines', 0)
+                            ))
+                
+                elif selected_table == "general_education":
+                    for _, row in df.iterrows():
+                        student_id = None
+                        if 'student_id' in row and pd.notna(row['student_id']):
+                            student_id = int(row['student_id'])
+                        else:
+                            s_name = row.get('s_name', '')
+                            f_name = row.get('f_name', '')
+                            if s_name and f_name:
+                                stu = c.execute("SELECT id FROM students WHERE name=? AND father_name=?", (s_name, f_name)).fetchone()
+                                if stu:
+                                    student_id = stu[0]
+                                else:
+                                    c.execute("INSERT INTO students (name, father_name) VALUES (?,?)", (s_name, f_name))
+                                    student_id = c.lastrowid
+                        if student_id:
+                            c.execute("""
+                                INSERT INTO general_education 
+                                (r_date, student_id, t_name, dept, book_subject, today_lesson, homework, performance, attendance)
+                                VALUES (?,?,?,?,?,?,?,?,?)
+                            """, (
+                                row.get('r_date', None), student_id, row.get('t_name', ''),
+                                row.get('dept', ''), row.get('book_subject', ''), row.get('today_lesson', ''),
+                                row.get('homework', ''), row.get('performance', ''), row.get('attendance', 'حاضر')
+                            ))
+                
+                elif selected_table == "qaida_records":
+                    for _, row in df.iterrows():
+                        student_id = None
+                        if 'student_id' in row and pd.notna(row['student_id']):
+                            student_id = int(row['student_id'])
+                        else:
+                            s_name = row.get('s_name', '')
+                            f_name = row.get('f_name', '')
+                            if s_name and f_name:
+                                stu = c.execute("SELECT id FROM students WHERE name=? AND father_name=?", (s_name, f_name)).fetchone()
+                                if stu:
+                                    student_id = stu[0]
+                                else:
+                                    c.execute("INSERT INTO students (name, father_name) VALUES (?,?)", (s_name, f_name))
+                                    student_id = c.lastrowid
+                        if student_id:
+                            c.execute("""
+                                INSERT INTO qaida_records 
+                                (r_date, student_id, t_name, lesson_no, total_lines, details, attendance)
+                                VALUES (?,?,?,?,?,?,?)
+                            """, (
+                                row.get('r_date', None), student_id, row.get('t_name', ''),
+                                row.get('lesson_no', ''), row.get('total_lines', 0),
+                                row.get('details', ''), row.get('attendance', 'حاضر')
+                            ))
+                
+                elif selected_table == "exams":
+                    for _, row in df.iterrows():
+                        student_id = None
+                        if 'student_id' in row and pd.notna(row['student_id']):
+                            student_id = int(row['student_id'])
+                        else:
+                            s_name = row.get('s_name', '')
+                            f_name = row.get('f_name', '')
+                            if s_name and f_name:
+                                stu = c.execute("SELECT id FROM students WHERE name=? AND father_name=?", (s_name, f_name)).fetchone()
+                                if stu:
+                                    student_id = stu[0]
+                                else:
+                                    c.execute("INSERT INTO students (name, father_name) VALUES (?,?)", (s_name, f_name))
+                                    student_id = c.lastrowid
+                        if student_id:
+                            c.execute("""
+                                INSERT INTO exams 
+                                (student_id, dept, exam_type, from_para, to_para, book_name, amount_read, start_date, end_date, total_days, q1, q2, q3, q4, q5, total, grade, status)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            """, (
+                                student_id, row.get('dept', ''), row.get('exam_type', ''),
+                                row.get('from_para', 0), row.get('to_para', 0), row.get('book_name', ''),
+                                row.get('amount_read', ''), row.get('start_date', None), row.get('end_date', None),
+                                row.get('total_days', 0), row.get('q1', 0), row.get('q2', 0), row.get('q3', 0),
+                                row.get('q4', 0), row.get('q5', 0), row.get('total', 0), row.get('grade', ''),
+                                row.get('status', 'پینڈنگ')
+                            ))
+                
+                else:
+                    # باقی ٹیبلز کے لیے سادہ INSERT (کالم نام CSV کے مطابق ہونے چاہئیں)
+                    columns = df.columns.tolist()
+                    placeholders = ','.join(['?' for _ in columns])
+                    query = f"INSERT INTO {selected_table} ({','.join(columns)}) VALUES ({placeholders})"
+                    for _, row in df.iterrows():
+                        c.execute(query, tuple(row[col] for col in columns))
+                
+                conn.commit()
+                conn.close()
+                log_audit(st.session_state.username, "CSV Restore", f"Table: {selected_table}, Mode: {upload_mode}")
+                st.success(f"ڈیٹا کامیابی سے {selected_table_display} میں محفوظ ہو گیا۔")
+                st.rerun()
+                
+        except Exception as e:
+            st.error(f"خرابی: {str(e)}۔ یقینی بنائیں کہ CSV فائل صحیح فارمیٹ میں ہے۔")
+    
+    st.markdown("---")
+    
+    # ========== 5. آڈٹ لاگ ==========
     with st.expander("آڈٹ لاگ"):
         conn = get_db_connection()
         logs = pd.read_sql_query("SELECT user, action, timestamp, details FROM audit_log ORDER BY timestamp DESC LIMIT 50", conn)
         conn.close()
         st.dataframe(logs)
-
 # ==================== 9. استاد کے سیکشن ====================
 # 9.1 روزانہ سبق اندراج
 if selected == "📝 روزانہ سبق اندراج" and st.session_state.user_type == "teacher":
