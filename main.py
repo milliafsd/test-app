@@ -1942,6 +1942,17 @@ elif selected == "📚 میرا ٹائم ٹیبل" and st.session_state.user_typ
         if st.button("🖨️ پرنٹ کریں"):
             st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_timetable}`);w.print();</script>", height=0)
 
+def add_student(name, father_name):
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO students (name, father_name) VALUES (?, ?)", (name, father_name))
+        conn.commit()  # یہ لائن سب سے اہم ہے
+        st.success("طالب علم کا ریکارڈ کامیابی سے محفوظ ہو گیا!")
+    except Exception as e:
+        st.error(f"ڈیٹا محفوظ کرنے میں مسئلہ: {e}")
+    finally:
+        conn.close()
 # ==================== 10. لاگ آؤٹ ====================
 st.sidebar.divider()
 if st.sidebar.button("🚪 لاگ آؤٹ"):
