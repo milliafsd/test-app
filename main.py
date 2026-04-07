@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -343,6 +344,33 @@ def get_grade_from_mistakes(total_mistakes):
     elif total_mistakes <= 8: return "جید"
     elif total_mistakes <= 12: return "مقبول"
     else: return "دوبارہ کوشش کریں"
+
+# نیا فنکشن: حاضری اور ناغہ کے حساب سے گریڈ
+def calculate_grade_with_attendance(attendance, sabaq_nagha, sq_nagha, m_nagha, sq_mistakes, m_mistakes):
+    if attendance == "غیر حاضر":
+        return "غیر حاضر"
+    if attendance == "رخصت":
+        return "رخصت"
+    
+    nagha_count = sum([sabaq_nagha, sq_nagha, m_nagha])
+    if nagha_count == 1:
+        return "ناقص (ناغہ)"
+    elif nagha_count == 2:
+        return "کمزور (ناغہ)"
+    elif nagha_count == 3:
+        return "ناکام (مکمل ناغہ)"
+    
+    total_mistakes = sq_mistakes + m_mistakes
+    if total_mistakes <= 2:
+        return "ممتاز"
+    elif total_mistakes <= 5:
+        return "جید جداً"
+    elif total_mistakes <= 8:
+        return "جید"
+    elif total_mistakes <= 12:
+        return "مقبول"
+    else:
+        return "دوبارہ کوشش کریں"
 
 def generate_exam_result_card(exam_row):
     html = f"""
@@ -1585,6 +1613,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         logs = pd.read_sql_query("SELECT user, action, timestamp, details FROM audit_log ORDER BY timestamp DESC LIMIT 50", conn)
         conn.close()
         st.dataframe(logs)
+
 # ==================== 9. استاد کے سیکشن ====================
 # 9.1 روزانہ سبق اندراج
 if selected == "📝 روزانہ سبق اندراج" and st.session_state.user_type == "teacher":
@@ -1655,6 +1684,10 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                     else:
                         m_parts = ["ناغہ"]
                         m_a = m_m = 0
+                    # گریڈ کا حساب
+                    grade = calculate_grade_with_attendance(att, sabaq_nagha, sq_nagha, m_nagha, sq_m, m_m)
+                    st.info(f"**اس طالب علم کا درجہ:** {grade}")
+                    
                     if st.button(f"محفوظ کریں ({s})", key=f"save_{key}"):
                         conn = get_db_connection()
                         c = conn.cursor()
@@ -1673,6 +1706,10 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                             st.success("محفوظ ہو گیا")
                         conn.close()
                 else:
+                    # غیر حاضر یا رخصت
+                    grade = calculate_grade_with_attendance(att, False, False, False, 0, 0)
+                    st.info(f"**اس طالب علم کا درجہ:** {grade}")
+                    
                     if st.button(f"محفوظ کریں ({s})", key=f"save_absent_{key}"):
                         conn = get_db_connection()
                         c = conn.cursor()
@@ -1942,19 +1979,9 @@ elif selected == "📚 میرا ٹائم ٹیبل" and st.session_state.user_typ
         if st.button("🖨️ پرنٹ کریں"):
             st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_timetable}`);w.print();</script>", height=0)
 
-def add_student(name, father_name):
-    conn = get_db_connection()
-    c = conn.cursor()
-    try:
-        c.execute("INSERT INTO students (name, father_name) VALUES (?, ?)", (name, father_name))
-        conn.commit()  # یہ لائن سب سے اہم ہے
-        st.success("طالب علم کا ریکارڈ کامیابی سے محفوظ ہو گیا!")
-    except Exception as e:
-        st.error(f"ڈیٹا محفوظ کرنے میں مسئلہ: {e}")
-    finally:
-        conn.close()
 # ==================== 10. لاگ آؤٹ ====================
 st.sidebar.divider()
 if st.sidebar.button("🚪 لاگ آؤٹ"):
     st.session_state.logged_in = False
     st.rerun()
+```
