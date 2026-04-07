@@ -1983,4 +1983,3 @@ st.sidebar.divider()
 if st.sidebar.button("🚪 لاگ آؤٹ"):
     st.session_state.logged_in = False
     st.rerun()
-```
