@@ -55,7 +55,7 @@ def init_db():
     add_column_if_not_exists('teachers', 'photo', 'TEXT')
     add_column_if_not_exists('teachers', 'joining_date', 'DATE')
     
-    # طلبہ ٹیبل (نیا کالم roll_no)
+    # طلبہ ٹیبل
     c.execute('''CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
@@ -115,7 +115,7 @@ def init_db():
     )''')
     add_column_if_not_exists('qaida_records', 'student_id', 'INTEGER')
     
-    # عمومی تعلیم (اب attendance کالم شامل)
+    # عمومی تعلیم
     c.execute('''CREATE TABLE IF NOT EXISTS general_education (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         r_date DATE,
@@ -244,7 +244,7 @@ def init_db():
     
     conn.commit()
     
-    # ========== مائیگریشن: پرانے ریکارڈز کو student_id سے منسلک کریں ==========
+    # مائیگریشن: پرانے ریکارڈز کو student_id سے منسلک کریں
     if column_exists('hifz_records', 's_name') and column_exists('hifz_records', 'f_name'):
         c.execute("SELECT id, s_name, f_name FROM hifz_records WHERE student_id IS NULL")
         old_records = c.fetchall()
@@ -344,7 +344,7 @@ def get_grade_from_mistakes(total_mistakes):
     elif total_mistakes <= 12: return "مقبول"
     else: return "دوبارہ کوشش کریں"
 
-# نیا فنکشن: حاضری اور ناغہ کے حساب سے گریڈ
+# درست شدہ گریڈ فنکشن: حاضری اور ناغہ کے حساب سے
 def calculate_grade_with_attendance(attendance, sabaq_nagha, sq_nagha, m_nagha, sq_mistakes, m_mistakes):
     if attendance == "غیر حاضر":
         return "غیر حاضر"
@@ -1614,7 +1614,7 @@ elif selected == "⚙️ بیک اپ & سیٹنگز" and st.session_state.user_t
         st.dataframe(logs)
 
 # ==================== 9. استاد کے سیکشن ====================
-# 9.1 روزانہ سبق اندراج
+# 9.1 روزانہ سبق اندراج (درست شدہ ورژن)
 if selected == "📝 روزانہ سبق اندراج" and st.session_state.user_type == "teacher":
     st.header("📝 روزانہ سبق اندراج")
     entry_date = st.date_input("تاریخ (جس دن کا اندراج کرنا ہے)", date.today())
@@ -1632,83 +1632,11 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                 key = f"{sid}_{s}_{f}"
                 st.markdown(f"### 👤 {s} ولد {f}")
                 att = st.radio("حاضری", ["حاضر", "غیر حاضر", "رخصت"], key=f"att_{key}", horizontal=True)
-                if att == "حاضر":
-                    sabaq_nagha = st.checkbox("سبق ناغہ", key=f"sabaq_nagha_{key}")
-                    if not sabaq_nagha:
-                        surah = st.selectbox("سورت", surahs_urdu, key=f"surah_{key}")
-                        a_from = st.text_input("آیت (سے)", key=f"af_{key}")
-                        a_to = st.text_input("آیت (تک)", key=f"at_{key}")
-                        sabq = f"{surah}: {a_from}-{a_to}"
-                        lines = st.number_input("کل ستر (لائنوں کی تعداد)", min_value=0, value=0, key=f"lines_{key}")
-                    else:
-                        sabq = "ناغہ"
-                        lines = 0
-                    sq_nagha = st.checkbox("سبقی ناغہ", key=f"sq_nagha_{key}")
-                    if not sq_nagha:
-                        if f"sq_rows_{key}" not in st.session_state:
-                            st.session_state[f"sq_rows_{key}"] = 1
-                        st.write("**سبقی**")
-                        sq_parts = []; sq_a = 0; sq_m = 0
-                        for i in range(st.session_state[f"sq_rows_{key}"]):
-                            cols = st.columns([2,2,1,1])
-                            p = cols[0].selectbox("پارہ", paras, key=f"sqp_{key}_{i}")
-                            v = cols[1].selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"sqv_{key}_{i}")
-                            a = cols[2].number_input("اٹکن", 0, key=f"sqa_{key}_{i}")
-                            e = cols[3].number_input("غلطی", 0, key=f"sqe_{key}_{i}")
-                            sq_parts.append(f"{p}:{v}")
-                            sq_a += a; sq_m += e
-                        if st.button("➕", key=f"add_sq_{key}", help="مزید سبقی پارہ شامل کریں"):
-                            st.session_state[f"sq_rows_{key}"] += 1
-                            st.rerun()
-                    else:
-                        sq_parts = ["ناغہ"]
-                        sq_a = sq_m = 0
-                    m_nagha = st.checkbox("منزل ناغہ", key=f"m_nagha_{key}")
-                    if not m_nagha:
-                        if f"m_rows_{key}" not in st.session_state:
-                            st.session_state[f"m_rows_{key}"] = 1
-                        st.write("**منزل**")
-                        m_parts = []; m_a = 0; m_m = 0
-                        for j in range(st.session_state[f"m_rows_{key}"]):
-                            cols = st.columns([2,2,1,1])
-                            p = cols[0].selectbox("پارہ", paras, key=f"mp_{key}_{j}")
-                            v = cols[1].selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"mv_{key}_{j}")
-                            a = cols[2].number_input("اٹکن", 0, key=f"ma_{key}_{j}")
-                            e = cols[3].number_input("غلطی", 0, key=f"me_{key}_{j}")
-                            m_parts.append(f"{p}:{v}")
-                            m_a += a; m_m += e
-                        if st.button("➕", key=f"add_m_{key}", help="مزید منزل پارہ شامل کریں"):
-                            st.session_state[f"m_rows_{key}"] += 1
-                            st.rerun()
-                    else:
-                        m_parts = ["ناغہ"]
-                        m_a = m_m = 0
-                    # گریڈ کا حساب
-                    grade = calculate_grade_with_attendance(att, sabaq_nagha, sq_nagha, m_nagha, sq_m, m_m)
-                    st.info(f"**اس طالب علم کا درجہ:** {grade}")
-                    
-                    if st.button(f"محفوظ کریں ({s})", key=f"save_{key}"):
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        chk = c.execute("SELECT 1 FROM hifz_records WHERE r_date=? AND student_id=?", (entry_date, sid)).fetchone()
-                        if chk:
-                            st.error(f"{s} کا ریکارڈ پہلے سے موجود ہے (تاریخ {entry_date})")
-                        else:
-                            c.execute("""INSERT INTO hifz_records 
-                                        (r_date, student_id, t_name, surah, lines, sq_p, sq_a, sq_m, m_p, m_a, m_m, attendance)
-                                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                      (entry_date, sid, st.session_state.username, sabq, lines,
-                                       " | ".join(sq_parts), sq_a, sq_m,
-                                       " | ".join(m_parts), m_a, m_m, att))
-                            conn.commit()
-                            log_audit(st.session_state.username, "Hifz Entry", f"{s} {entry_date}")
-                            st.success("محفوظ ہو گیا")
-                        conn.close()
-                else:
-                    # غیر حاضر یا رخصت
+                
+                # اگر غیر حاضر یا رخصت ہو تو صرف حاضری محفوظ کریں
+                if att != "حاضر":
                     grade = calculate_grade_with_attendance(att, False, False, False, 0, 0)
                     st.info(f"**اس طالب علم کا درجہ:** {grade}")
-                    
                     if st.button(f"محفوظ کریں ({s})", key=f"save_absent_{key}"):
                         conn = get_db_connection()
                         c = conn.cursor()
@@ -1723,6 +1651,87 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                             conn.commit()
                             st.success("محفوظ ہو گیا")
                         conn.close()
+                    st.markdown("---")
+                    continue
+                
+                # حاضر ہونے کی صورت میں تفصیلات بھریں
+                # سبق (ناغہ چیک باکس)
+                sabaq_nagha = st.checkbox("سبق: یاد نہیں (ناغہ)", key=f"sabaq_nagha_{key}")
+                if not sabaq_nagha:
+                    surah = st.selectbox("سورت", surahs_urdu, key=f"surah_{key}")
+                    a_from = st.text_input("آیت (سے)", key=f"af_{key}")
+                    a_to = st.text_input("آیت (تک)", key=f"at_{key}")
+                    sabq = f"{surah}: {a_from}-{a_to}"
+                    lines = st.number_input("کل ستر (لائنوں کی تعداد)", min_value=0, value=0, key=f"lines_{key}")
+                else:
+                    sabq = "ناغہ"
+                    lines = 0
+                
+                # سبقی (ناغہ چیک باکس)
+                sq_nagha = st.checkbox("سبقی: یاد نہیں (ناغہ)", key=f"sq_nagha_{key}")
+                if not sq_nagha:
+                    if f"sq_rows_{key}" not in st.session_state:
+                        st.session_state[f"sq_rows_{key}"] = 1
+                    st.write("**سبقی**")
+                    sq_parts = []; sq_a = 0; sq_m = 0
+                    for i in range(st.session_state[f"sq_rows_{key}"]):
+                        cols = st.columns([2,2,1,1])
+                        p = cols[0].selectbox("پارہ", paras, key=f"sqp_{key}_{i}")
+                        v = cols[1].selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"sqv_{key}_{i}")
+                        a = cols[2].number_input("اٹکن", 0, key=f"sqa_{key}_{i}")
+                        e = cols[3].number_input("غلطی", 0, key=f"sqe_{key}_{i}")
+                        sq_parts.append(f"{p}:{v}")
+                        sq_a += a; sq_m += e
+                    if st.button("➕", key=f"add_sq_{key}", help="مزید سبقی پارہ شامل کریں"):
+                        st.session_state[f"sq_rows_{key}"] += 1
+                        st.rerun()
+                else:
+                    sq_parts = ["ناغہ"]
+                    sq_a = sq_m = 0
+                
+                # منزل (ناغہ چیک باکس)
+                m_nagha = st.checkbox("منزل: یاد نہیں (ناغہ)", key=f"m_nagha_{key}")
+                if not m_nagha:
+                    if f"m_rows_{key}" not in st.session_state:
+                        st.session_state[f"m_rows_{key}"] = 1
+                    st.write("**منزل**")
+                    m_parts = []; m_a = 0; m_m = 0
+                    for j in range(st.session_state[f"m_rows_{key}"]):
+                        cols = st.columns([2,2,1,1])
+                        p = cols[0].selectbox("پارہ", paras, key=f"mp_{key}_{j}")
+                        v = cols[1].selectbox("مقدار", ["مکمل", "آدھا", "پون", "پاؤ"], key=f"mv_{key}_{j}")
+                        a = cols[2].number_input("اٹکن", 0, key=f"ma_{key}_{j}")
+                        e = cols[3].number_input("غلطی", 0, key=f"me_{key}_{j}")
+                        m_parts.append(f"{p}:{v}")
+                        m_a += a; m_m += e
+                    if st.button("➕", key=f"add_m_{key}", help="مزید منزل پارہ شامل کریں"):
+                        st.session_state[f"m_rows_{key}"] += 1
+                        st.rerun()
+                else:
+                    m_parts = ["ناغہ"]
+                    m_a = m_m = 0
+                
+                # گریڈ کا حساب (ناغہ کے ساتھ)
+                grade = calculate_grade_with_attendance(att, sabaq_nagha, sq_nagha, m_nagha, sq_m, m_m)
+                st.info(f"**اس طالب علم کا درجہ:** {grade}")
+                
+                if st.button(f"محفوظ کریں ({s})", key=f"save_{key}"):
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    chk = c.execute("SELECT 1 FROM hifz_records WHERE r_date=? AND student_id=?", (entry_date, sid)).fetchone()
+                    if chk:
+                        st.error(f"{s} کا ریکارڈ پہلے سے موجود ہے (تاریخ {entry_date})")
+                    else:
+                        c.execute("""INSERT INTO hifz_records 
+                                    (r_date, student_id, t_name, surah, lines, sq_p, sq_a, sq_m, m_p, m_a, m_m, attendance)
+                                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                  (entry_date, sid, st.session_state.username, sabq, lines,
+                                   " | ".join(sq_parts), sq_a, sq_m,
+                                   " | ".join(m_parts), m_a, m_m, att))
+                        conn.commit()
+                        log_audit(st.session_state.username, "Hifz Entry", f"{s} {entry_date}")
+                        st.success("محفوظ ہو گیا")
+                    conn.close()
                 st.markdown("---")
     
     elif dept == "قاعدہ":
@@ -1745,7 +1754,7 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                             lesson_no = st.text_input("تختی نمبر / سبق نمبر", key=f"lesson_{key}")
                             total_lines = st.number_input("کل لائنیں", min_value=0, value=0, key=f"lines_{key}")
                             details = ""
-                        else:  # نماز حنفی
+                        else:
                             lesson_no = st.selectbox("سبق منتخب کریں", [
                                 "وضو کا طریقہ", "غسل کا طریقہ", "تیمم کا طریقہ",
                                 "اذان و اقامت", "نماز کا طریقہ (مسنون)", "دعائے ثنا",
