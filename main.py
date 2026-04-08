@@ -344,13 +344,15 @@ def get_grade_from_mistakes(total_mistakes):
     elif total_mistakes <= 12: return "مقبول"
     else: return "دوبارہ کوشش کریں"
 
-# گریڈ فنکشن: حاضری اور ناغہ/یاد نہیں کے حساب سے
+# درست گریڈ فنکشن: حاضری اور ناغہ کے حساب سے
 def calculate_grade_with_attendance(attendance, sabaq_nagha, sq_nagha, m_nagha, sq_mistakes, m_mistakes):
+    # پہلے حاضری چیک کریں
     if attendance == "غیر حاضر":
         return "غیر حاضر"
     if attendance == "رخصت":
         return "رخصت"
     
+    # اب ناغہ (یاد نہیں بھی ناغہ شمار) کی تعداد
     nagha_count = sum([sabaq_nagha, sq_nagha, m_nagha])
     if nagha_count == 1:
         return "ناقص (ناغہ)"
@@ -359,6 +361,7 @@ def calculate_grade_with_attendance(attendance, sabaq_nagha, sq_nagha, m_nagha, 
     elif nagha_count == 3:
         return "ناکام (مکمل ناغہ)"
     
+    # اگر کوئی ناغہ نہیں تو غلطیوں کی بنیاد پر گریڈ
     total_mistakes = sq_mistakes + m_mistakes
     if total_mistakes <= 2:
         return "ممتاز"
@@ -696,9 +699,9 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
         try:
             hifz_df = pd.read_sql_query("""
                 SELECT h.r_date as تاریخ, s.name as نام, s.father_name as 'والد کا نام', s.roll_no as 'شناختی نمبر', h.t_name as استاد, 
-                       'حفظ' as شعبہ, h.surah as 'سبق (آیت تا آیت)', h.lines as 'کل ستر',
-                       h.sq_p as 'سبقی (پارہ)', h.sq_m as 'سبقی (غلطی)', h.sq_a as 'سبقی (اٹکن)',
-                       h.m_p as 'منزل (پارہ)', h.m_m as 'منزل (غلطی)', h.m_a as 'منزل (اٹکن)',
+                       'حفظ' as شعبہ, h.surah as 'سبق', h.lines as 'کل ستر',
+                       h.sq_p as 'سبقی', h.sq_m as 'سبقی (غلطی)', h.sq_a as 'سبقی (اٹکن)',
+                       h.m_p as 'منزل', h.m_m as 'منزل (غلطی)', h.m_a as 'منزل (اٹکن)',
                        h.attendance as حاضری
                 FROM hifz_records h
                 JOIN students s ON h.student_id = s.id
@@ -706,9 +709,7 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
             """, conn, params=(d1, d2))
             conn.close()
             if not hifz_df.empty:
-                if 'سبقی (غلطی)' in hifz_df.columns and 'منزل (غلطی)' in hifz_df.columns:
-                    hifz_df['کل_غلطیاں'] = hifz_df['سبقی (غلطی)'].fillna(0) + hifz_df['منزل (غلطی)'].fillna(0)
-                    hifz_df['درجہ'] = hifz_df['کل_غلطیاں'].apply(get_grade_from_mistakes)
+                # یہاں گریڈ کا حساب لگانے کی ضرورت نہیں، صرف دکھانا ہے
                 if sel_teacher != "تمام":
                     hifz_df = hifz_df[hifz_df['استاد'] == sel_teacher]
                 combined_df = pd.concat([combined_df, hifz_df], ignore_index=True)
@@ -729,8 +730,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
             """, conn, params=(d1, d2))
             conn.close()
             if not qaida_df.empty:
-                qaida_df['کل_غلطیاں'] = ''
-                qaida_df['درجہ'] = ''
                 if sel_teacher != "تمام":
                     qaida_df = qaida_df[qaida_df['استاد'] == sel_teacher]
                 combined_df = pd.concat([combined_df, qaida_df], ignore_index=True)
@@ -770,8 +769,6 @@ elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.
             gen_df = pd.read_sql_query(query, conn, params=params)
             conn.close()
             if not gen_df.empty:
-                gen_df['کل_غلطیاں'] = ''
-                gen_df['درجہ'] = ''
                 combined_df = pd.concat([combined_df, gen_df], ignore_index=True)
         except Exception as e:
             st.error(f"عمومی تعلیم کے ریکارڈ لوڈ کرتے وقت خرابی: {str(e)}")
@@ -956,17 +953,32 @@ elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user
         
         if dept == "حفظ":
             conn = get_db_connection()
-            df = pd.read_sql_query("""SELECT r_date as تاریخ, attendance as حاضری, surah as 'سبق (آیت تا آیت)', lines as 'کل ستر',
-                                      sq_p as 'سبقی (پارہ)', sq_m as 'سبقی (غلطی)', sq_a as 'سبقی (اٹکن)',
-                                      m_p as 'منزل (پارہ)', m_m as 'منزل (غلطی)', m_a as 'منزل (اٹکن)'
+            df = pd.read_sql_query("""SELECT r_date as تاریخ, attendance as حاضری, surah as 'سبق', lines as 'کل ستر',
+                                      sq_p as 'سبقی', sq_m as 'سبقی (غلطی)', sq_a as 'سبقی (اٹکن)',
+                                      m_p as 'منزل', m_m as 'منزل (غلطی)', m_a as 'منزل (اٹکن)'
                                       FROM hifz_records WHERE student_id=? AND r_date BETWEEN ? AND ?
                                       ORDER BY r_date ASC""", conn, params=(student_id, start, end))
             conn.close()
             if not df.empty:
-                df['کل_غلطیاں'] = df['سبقی (غلطی)'] + df['منزل (غلطی)']
-                df['درجہ'] = df['کل_غلطیاں'].apply(get_grade_from_mistakes)
-                avg_mistakes = df['کل_غلطیاں'].mean()
-                st.info(f"**اوسط غلطیاں:** {round(avg_mistakes, 1)} | **مجموعی درجہ:** {get_grade_from_mistakes(avg_mistakes)}")
+                st.dataframe(df, use_container_width=True)
+                # گریڈ کا حساب لگانے کے لیے ہر ریکارڈ پر الگ سے حساب لگائیں
+                grades = []
+                for idx, row in df.iterrows():
+                    att = row['حاضری']
+                    sabaq_nagha = (row['سبق'] == "ناغہ" or row['سبق'] == "یاد نہیں")
+                    sq_nagha = (row['سبقی'] == "ناغہ" or row['سبقی'] == "یاد نہیں")
+                    m_nagha = (row['منزل'] == "ناغہ" or row['منزل'] == "یاد نہیں")
+                    sq_m = row['سبقی (غلطی)'] if pd.notna(row['سبقی (غلطی)']) else 0
+                    m_m = row['منزل (غلطی)'] if pd.notna(row['منزل (غلطی)']) else 0
+                    grade = calculate_grade_with_attendance(att, sabaq_nagha, sq_nagha, m_nagha, sq_m, m_m)
+                    grades.append(grade)
+                df['درجہ'] = grades
+                st.dataframe(df[['تاریخ', 'حاضری', 'سبق', 'سبقی', 'منزل', 'درجہ']], use_container_width=True)
+                html = generate_html_report(df, "ماہانہ رزلٹ کارڈ (حفظ)", student_name=f"{s_name} ولد {f_name}",
+                                            start_date=start.strftime("%Y-%m-%d"), end_date=end.strftime("%Y-%m-%d"))
+                st.download_button("📥 HTML ڈاؤن لوڈ", html, f"{s_name}_result.html", "text/html")
+                if st.button("🖨️ پرنٹ کریں"):
+                    st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
         elif dept == "قاعدہ":
             conn = get_db_connection()
             df = pd.read_sql_query("""SELECT r_date as تاریخ, lesson_no as 'تختی نمبر', total_lines as 'کل لائنیں',
@@ -990,24 +1002,13 @@ elif selected == "📜 ماہانہ رزلٹ کارڈ" and st.session_state.user
                                       FROM general_education WHERE student_id=? AND dept=? AND r_date BETWEEN ? AND ?
                                       ORDER BY r_date ASC""", conn, params=(student_id, dept, start, end))
             conn.close()
-        
-        if dept not in ["قاعدہ"] and not df.empty:
-            st.dataframe(df, use_container_width=True)
-            passed = []
-            if dept == "حفظ":
-                conn = get_db_connection()
-                passed = conn.execute("SELECT para_no, passed_date, grade FROM passed_paras WHERE student_id=? ORDER BY para_no", (student_id,)).fetchall()
-                conn.close()
-                if passed:
-                    st.write("**پاس شدہ پارے:**")
-                    for p in passed:
-                        st.write(f"پارہ {p[0]} - تاریخ: {p[1]} - گریڈ: {p[2]}")
-            html = generate_html_report(df, "ماہانہ رزلٹ کارڈ", student_name=f"{s_name} ولد {f_name}",
-                                        start_date=start.strftime("%Y-%m-%d"), end_date=end.strftime("%Y-%m-%d"),
-                                        passed_paras=[p[0] for p in passed] if passed else None)
-            st.download_button("📥 HTML ڈاؤن لوڈ", html, f"{s_name}_result.html", "text/html")
-            if st.button("🖨️ پرنٹ کریں"):
-                st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
+            if not df.empty:
+                st.dataframe(df, use_container_width=True)
+                html = generate_html_report(df, "ماہانہ رزلٹ کارڈ", student_name=f"{s_name} ولد {f_name}",
+                                            start_date=start.strftime("%Y-%m-%d"), end_date=end.strftime("%Y-%m-%d"))
+                st.download_button("📥 HTML ڈاؤن لوڈ", html, f"{s_name}_result.html", "text/html")
+                if st.button("🖨️ پرنٹ کریں"):
+                    st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html}`);w.print();</script>", height=0)
 
 # 8.6 پارہ تعلیمی رپورٹ
 elif selected == "📘 پارہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
@@ -1473,6 +1474,7 @@ if selected == "📝 روزانہ سبق اندراج" and st.session_state.user
                 st.markdown(f"### 👤 {s} ولد {f}")
                 att = st.radio("حاضری", ["حاضر", "غیر حاضر", "رخصت"], key=f"att_{key}", horizontal=True)
                 
+                # اگر غیر حاضر یا رخصت ہو تو صرف حاضری محفوظ کریں
                 if att != "حاضر":
                     grade = calculate_grade_with_attendance(att, False, False, False, 0, 0)
                     st.info(f"**اس طالب علم کا درجہ:** {grade}")
