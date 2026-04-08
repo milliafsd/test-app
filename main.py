@@ -1162,123 +1162,133 @@ elif selected == "👥 یوزر مینجمنٹ" and st.session_state.user_type =
                     else:
                         st.error("نام اور پاسورڈ ضروری ہیں")
     
-    # ==================== طلبہ کا ٹیب (درست شدہ) ====================
-    with tab2:
-        st.subheader("موجودہ طلبہ (شناختی نمبر تبدیل کریں)")
-        conn = get_db_connection()
-        # تمام کالم حاصل کریں جو موجود ہیں
-        all_columns = ["id", "name", "father_name", "mother_name", "dob", "admission_date", "exit_date", "exit_reason",
-                       "id_card", "phone", "address", "teacher_name", "dept", "class", "section", "roll_no"]
-        existing_cols = []
-        for col in all_columns:
-            if column_exists("students", col):
-                existing_cols.append(col)
-        query = f"SELECT {', '.join(existing_cols)} FROM students"
-        students_df = pd.read_sql_query(query, conn)
-        conn.close()
+    # ==================== یوزر مینجمنٹ - طلبہ ٹیب (درست شدہ) ====================
+with tab2:
+    st.subheader("موجودہ طلبہ (شناختی نمبر تبدیل کریں)")
+    conn = get_db_connection()
+    # تمام کالم حاصل کریں جو موجود ہیں
+    all_columns = ["id", "name", "father_name", "mother_name", "dob", "admission_date", "exit_date", "exit_reason",
+                   "id_card", "phone", "address", "teacher_name", "dept", "class", "section", "roll_no"]
+    existing_cols = []
+    for col in all_columns:
+        if column_exists("students", col):
+            existing_cols.append(col)
+    query = f"SELECT {', '.join(existing_cols)} FROM students"
+    students_df = pd.read_sql_query(query, conn)
+    conn.close()
+    
+    if not students_df.empty:
+        # ڈیٹا ایڈیٹر دکھائیں
+        edited_students = st.data_editor(students_df, num_rows="dynamic", use_container_width=True, key="students_edit")
         
-        if not students_df.empty:
-            # ڈیٹا ایڈیٹر دکھائیں
-            edited_students = st.data_editor(students_df, num_rows="dynamic", use_container_width=True, key="students_edit")
+        if st.button("طلبہ میں تبدیلیاں محفوظ کریں"):
+            conn = get_db_connection()
+            c = conn.cursor()
             
-            if st.button("طلبہ میں تبدیلیاں محفوظ کریں (شناختی نمبر تبدیل کرنے سے پرانا ریکارڈ بھی اپ ڈیٹ ہو جائے گا)"):
-                conn = get_db_connection()
-                c = conn.cursor()
-                
-                # حذف شدہ طلبہ: جو پرانی ڈی ایف میں تھے لیکن نئی میں نہیں
-                old_ids = set(students_df['id'])
-                new_ids = set(edited_students['id']) if 'id' in edited_students.columns else set()
-                deleted_ids = old_ids - new_ids
-                for did in deleted_ids:
-                    # پہلے متعلقہ ریکارڈز حذف کریں (FOREIGN KEY ON DELETE CASCADE سے خودکار حذف ہوں گے)
-                    c.execute("DELETE FROM students WHERE id=?", (did,))
-                
-                # اپ ڈیٹ اور نئی قطاریں
-                for _, row in edited_students.iterrows():
-                    if pd.isna(row['id']) or row['id'] == 0 or row['id'] == '':
-                        # نیا طالب علم داخل کریں
-                        col_names = [col for col in existing_cols if col != 'id']
-                        placeholders = ",".join(["?" for _ in col_names])
-                        values = [row[col] for col in col_names]
-                        # تاریخوں کو درست فارمیٹ میں تبدیل کریں
-                        for i, col in enumerate(col_names):
-                            if col in ['dob', 'admission_date', 'exit_date'] and values[i] is not None:
-                                if isinstance(values[i], (date, datetime)):
-                                    values[i] = values[i].strftime("%Y-%m-%d")
-                        c.execute(f"INSERT INTO students ({','.join(col_names)}) VALUES ({placeholders})", values)
-                    else:
-                        # موجودہ طالب علم اپ ڈیٹ کریں
-                        set_clause = ",".join([f"{col}=?" for col in existing_cols if col != 'id'])
-                        values = []
-                        for col in existing_cols:
-                            if col != 'id':
-                                val = row[col]
-                                if col in ['dob', 'admission_date', 'exit_date'] and val is not None:
+            # 1. حذف شدہ طلبہ: جو پرانی ڈی ایف میں تھے لیکن نئی میں نہیں
+            old_ids = set(students_df['id'])
+            new_ids = set(edited_students['id']) if 'id' in edited_students.columns else set()
+            deleted_ids = old_ids - new_ids
+            for did in deleted_ids:
+                c.execute("DELETE FROM students WHERE id=?", (did,))
+            
+            # 2. اپ ڈیٹ اور نئی قطاریں
+            for _, row in edited_students.iterrows():
+                if pd.isna(row['id']) or row['id'] == 0 or row['id'] == '':
+                    # نیا طالب علم داخل کریں
+                    col_names = [col for col in existing_cols if col != 'id']
+                    placeholders = ",".join(["?" for _ in col_names])
+                    values = []
+                    for col in col_names:
+                        val = row[col]
+                        if col in ['dob', 'admission_date', 'exit_date']:
+                            if pd.notna(val) and val:
+                                if isinstance(val, (date, datetime)):
+                                    val = val.strftime("%Y-%m-%d")
+                                else:
+                                    val = str(val)
+                            else:
+                                val = None
+                        values.append(val)
+                    c.execute(f"INSERT INTO students ({','.join(col_names)}) VALUES ({placeholders})", values)
+                else:
+                    # موجودہ طالب علم اپ ڈیٹ کریں
+                    set_clause = ",".join([f"{col}=?" for col in existing_cols if col != 'id'])
+                    values = []
+                    for col in existing_cols:
+                        if col != 'id':
+                            val = row[col]
+                            if col in ['dob', 'admission_date', 'exit_date']:
+                                if pd.notna(val) and val:
                                     if isinstance(val, (date, datetime)):
                                         val = val.strftime("%Y-%m-%d")
-                                values.append(val)
-                        values.append(row['id'])
-                        c.execute(f"UPDATE students SET {set_clause} WHERE id=?", values)
-                
-                conn.commit()
+                                    else:
+                                        val = str(val)
+                                else:
+                                    val = None
+                            values.append(val)
+                    values.append(row['id'])  # WHERE clause کے لیے
+                    c.execute(f"UPDATE students SET {set_clause} WHERE id=?", values)
+            
+            conn.commit()
+            conn.close()
+            st.success("تبدیلیاں محفوظ ہو گئیں")
+            st.rerun()
+    else:
+        st.info("کوئی طالب علم موجود نہیں")
+    
+    with st.expander("➕ نیا طالب علم داخل کریں"):
+        with st.form("new_student_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                name = st.text_input("طالب علم کا نام*")
+                father = st.text_input("والد کا نام*")
+                mother = st.text_input("والدہ کا نام")
+                dob = st.date_input("تاریخ پیدائش", date.today() - timedelta(days=365*10))
+                admission_date = st.date_input("تاریخ داخلہ", date.today())
+                roll_no = st.text_input("شناختی نمبر (اختیاری)", placeholder="مثلاً: 2024-001")
+            with col2:
+                dept = st.selectbox("شعبہ*", ["حفظ", "قاعدہ", "درسِ نظامی", "عصری تعلیم"])
+                class_name = st.text_input("کلاس (عصری تعلیم کے لیے)")
+                section = st.text_input("سیکشن")
+                conn = get_db_connection()
+                teachers_list = [t[0] for t in conn.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
                 conn.close()
-                st.success("تبدیلیاں محفوظ ہو گئیں (پرانا ریکارڈ برقرار ہے، شناختی نمبر اپ ڈیٹ ہو گیا)")
-                st.rerun()
-        else:
-            st.info("کوئی طالب علم موجود نہیں")
-        
-        with st.expander("➕ نیا طالب علم داخل کریں"):
-            with st.form("new_student_form"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    name = st.text_input("طالب علم کا نام*")
-                    father = st.text_input("والد کا نام*")
-                    mother = st.text_input("والدہ کا نام")
-                    dob = st.date_input("تاریخ پیدائش", date.today() - timedelta(days=365*10))
-                    admission_date = st.date_input("تاریخ داخلہ", date.today())
-                    roll_no = st.text_input("شناختی نمبر (اختیاری)", placeholder="مثلاً: 2024-001")
-                with col2:
-                    dept = st.selectbox("شعبہ*", ["حفظ", "قاعدہ", "درسِ نظامی", "عصری تعلیم"])
-                    class_name = st.text_input("کلاس (عصری تعلیم کے لیے)")
-                    section = st.text_input("سیکشن")
+                teacher = st.selectbox("استاد*", teachers_list) if teachers_list else st.text_input("استاد کا نام*")
+            id_card = st.text_input("B-Form / شناختی کارڈ نمبر")
+            phone = st.text_input("فون نمبر")
+            address = st.text_area("پتہ")
+            photo = st.file_uploader("تصویر (اختیاری)", type=["jpg", "png", "jpeg"])
+            st.markdown("---")
+            st.markdown("**اگر طالب علم مدرسہ چھوڑ چکا ہے تو درج ذیل معلومات بھریں (ورنہ خالی چھوڑیں):**")
+            exit_date = st.date_input("تاریخ خارج", value=None)
+            exit_reason = st.text_area("وجہ خارج")
+            if st.form_submit_button("داخلہ کریں"):
+                if name and father and teacher and dept:
                     conn = get_db_connection()
-                    teachers_list = [t[0] for t in conn.execute("SELECT name FROM teachers WHERE name!='admin'").fetchall()]
-                    conn.close()
-                    teacher = st.selectbox("استاد*", teachers_list) if teachers_list else st.text_input("استاد کا نام*")
-                id_card = st.text_input("B-Form / شناختی کارڈ نمبر")
-                phone = st.text_input("فون نمبر")
-                address = st.text_area("پتہ")
-                photo = st.file_uploader("تصویر (اختیاری)", type=["jpg", "png", "jpeg"])
-                st.markdown("---")
-                st.markdown("**اگر طالب علم مدرسہ چھوڑ چکا ہے تو درج ذیل معلومات بھریں (ورنہ خالی چھوڑیں):**")
-                exit_date = st.date_input("تاریخ خارج", value=None)
-                exit_reason = st.text_area("وجہ خارج")
-                if st.form_submit_button("داخلہ کریں"):
-                    if name and father and teacher and dept:
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        try:
-                            photo_path = None
-                            if photo:
-                                os.makedirs("uploads", exist_ok=True)
-                                photo_path = f"uploads/student_{name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
-                                with open(photo_path, "wb") as f:
-                                    f.write(photo.getbuffer())
-                            c.execute("""INSERT INTO students 
-                                        (name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
-                                         id_card, phone, address, teacher_name, dept, class, section, photo, roll_no)
-                                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                      (name, father, mother, dob, admission_date, exit_date, exit_reason,
-                                       id_card, phone, address, teacher, dept, class_name, section, photo_path, roll_no))
-                            conn.commit()
-                            st.success("طالب علم کامیابی سے داخل ہو گیا")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"خرابی: {str(e)}")
-                        finally:
-                            conn.close()
-                    else:
-                        st.error("نام، ولدیت، استاد اور شعبہ ضروری ہیں")
+                    c = conn.cursor()
+                    try:
+                        photo_path = None
+                        if photo:
+                            os.makedirs("uploads", exist_ok=True)
+                            photo_path = f"uploads/student_{name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+                            with open(photo_path, "wb") as f:
+                                f.write(photo.getbuffer())
+                        c.execute("""INSERT INTO students 
+                                    (name, father_name, mother_name, dob, admission_date, exit_date, exit_reason,
+                                     id_card, phone, address, teacher_name, dept, class, section, photo, roll_no)
+                                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                  (name, father, mother, dob, admission_date, exit_date, exit_reason,
+                                   id_card, phone, address, teacher, dept, class_name, section, photo_path, roll_no))
+                        conn.commit()
+                        st.success("طالب علم کامیابی سے داخل ہو گیا")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"خرابی: {str(e)}")
+                    finally:
+                        conn.close()
+                else:
+                    st.error("نام، ولدیت، استاد اور شعبہ ضروری ہیں")
 
 # 8.10 ٹائم ٹیبل مینجمنٹ
 elif selected == "📚 ٹائم ٹیبل مینجمنٹ" and st.session_state.user_type == "admin":
