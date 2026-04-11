@@ -39,6 +39,18 @@ def add_column_if_not_exists(table, column, col_type):
         conn.close()
 
 def init_db():
+    # پہلے تمام ضروری کالمز شامل کریں (اگر ٹیبل پہلے سے موجود ہوں)
+    add_column_if_not_exists('teachers', 'role', 'TEXT DEFAULT "teacher"')
+    add_column_if_not_exists('students', 'dars_level_id', 'INTEGER')
+    add_column_if_not_exists('students', 'session_id', 'INTEGER')
+    add_column_if_not_exists('general_education', 'lesson_from', 'TEXT')
+    add_column_if_not_exists('general_education', 'lesson_to', 'TEXT')
+    add_column_if_not_exists('hifz_records', 'student_id', 'INTEGER')
+    add_column_if_not_exists('qaida_records', 'student_id', 'INTEGER')
+    add_column_if_not_exists('general_education', 'student_id', 'INTEGER')
+    add_column_if_not_exists('exams', 'student_id', 'INTEGER')
+    add_column_if_not_exists('passed_paras', 'student_id', 'INTEGER')
+
     conn = get_db_connection()
     c = conn.cursor()
 
@@ -302,18 +314,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-    # مائیگریشن: پرانے ڈیٹا میں کالم شامل کریں
-    add_column_if_not_exists('general_education', 'lesson_from', 'TEXT')
-    add_column_if_not_exists('general_education', 'lesson_to', 'TEXT')
-    add_column_if_not_exists('teachers', 'role', 'TEXT DEFAULT "teacher"')
-    add_column_if_not_exists('students', 'dars_level_id', 'INTEGER')
-    add_column_if_not_exists('students', 'session_id', 'INTEGER')
-    add_column_if_not_exists('hifz_records', 'student_id', 'INTEGER')
-    add_column_if_not_exists('qaida_records', 'student_id', 'INTEGER')
-    add_column_if_not_exists('general_education', 'student_id', 'INTEGER')
-    add_column_if_not_exists('exams', 'student_id', 'INTEGER')
-    add_column_if_not_exists('passed_paras', 'student_id', 'INTEGER')
-
 init_db()
 
 # ==================== 2. ہیلپر فنکشنز ====================
@@ -508,6 +508,7 @@ if not st.session_state.logged_in:
                 if res:
                     st.session_state.logged_in = True
                     st.session_state.username = u
+                    # تعین کریں کہ ایڈمن، عام استاد یا عصری استاد
                     role = res[9] if len(res) > 9 and res[9] else 'teacher'
                     if u == "admin":
                         st.session_state.user_type = "admin"
