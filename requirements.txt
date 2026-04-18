@@ -8,3 +8,5 @@ openpyxl>=3.1.0
 qrcode[pil]
 plotly
 PyGithub
+st-supabase-connection
+supabase
