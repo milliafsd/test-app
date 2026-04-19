@@ -314,7 +314,29 @@ def init_db():
     conn.close()
 
 init_db()
+def create_admin_user():
+    admin_data = {
+        "name": "admin",
+        "password": hash_password("jamia123"),
+        "dept": "Admin"
+    }
+    try:
+        # پہلے چیک کریں کہ کہیں admin پہلے سے تو موجود نہیں
+        existing = supabase.table("teachers").select("id").eq("name", "admin").execute()
+        if existing.data:
+            # اگر موجود ہے تو اپ ڈیٹ کریں
+            supabase.table("teachers").update({"password": hash_password("jamia123")}).eq("name", "admin").execute()
+            st.success("ایڈمن کا پاسورڈ اپ ڈیٹ کر دیا گیا ہے۔")
+        else:
+            # اگر موجود نہیں تو داخل کریں
+            supabase.table("teachers").insert(admin_data).execute()
+            st.success("ایڈمن صارف کامیابی سے بن گیا ہے۔")
+    except Exception as e:
+        st.error(f"خرابی: {e}")
 
+# اسے کال کرنے کے لیے بٹن
+if st.button("🛠️ ایڈمن صارف بنائیں / درست کریں"):
+    create_admin_user()
 # ==================== 2. ہیلپر فنکشنز ====================
 def log_audit(user, action, details=""):
     try:
