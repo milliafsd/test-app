@@ -604,6 +604,8 @@ if not st.session_state.logged_in:
             st.markdown("<div class='report-card'><h3>🔐 لاگ ان</h3>", unsafe_allow_html=True)
             u = st.text_input("صارف نام")
             p = st.text_input("پاسورڈ", type="password")
+            
+            # لاگ ان بٹن
             if st.button("داخل ہوں"):
                 res = verify_login(u, p)
                 if res:
@@ -611,10 +613,13 @@ if not st.session_state.logged_in:
                     st.session_state.user_type = "admin" if u == "admin" else "teacher"
                     log_audit(u, "Login", f"User type: {st.session_state.user_type}")
                     st.rerun()
-             if st.button("🛠️ Supabase ٹیبلز بنائیں"):
-                create_all_tables_in_supabase()
                 else:
                     st.error("غلط معلومات")
+            
+            # Supabase ٹیبلز بنانے کا بٹن (عارضی)
+            if st.button("🛠️ Supabase ٹیبلز بنائیں"):
+                create_all_tables_in_supabase()
+            
             st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
