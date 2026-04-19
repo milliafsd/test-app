@@ -9,7 +9,10 @@ import hashlib
 import shutil
 import zipfile
 import io
-
+from st_supabase_connection import SupabaseConnection
+# Supabase کنکشن
+supabase_conn = st.connection("supabase", type=SupabaseConnection)
+supabase = supabase_conn.client
 # ==================== 1. ڈیٹا بیس سیٹ اپ ====================
 DB_NAME = 'jamia_millia_data.db'
 
@@ -2146,10 +2149,9 @@ def create_all_tables_in_supabase():
         supabase.table("staff_monitoring").delete().eq("staff_name", "test").execute()
         st.write("✅ staff_monitoring")
 
-        st.success("تمام 13 ٹیبلز کامیابی سے بن گئیں!")
+        st.success("🎉 تمام 13 ٹیبلز کامیابی سے بن گئیں!")
     except Exception as e:
-        st.error(f"خرابی: {str(e)}")
-
+        st.error(f"❌ خرابی: {str(e)}")
 
 # ==================== 10. لاگ آؤٹ ====================
 st.sidebar.divider()
