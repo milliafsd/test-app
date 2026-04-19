@@ -625,9 +625,8 @@ if st.session_state.user_type == "admin":
 else:
     menu = ["📝 روزانہ سبق اندراج", "🎓 امتحانی درخواست", "📩 رخصت کی درخواست",
             "🕒 میری حاضری", "📚 میرا ٹائم ٹیبل", "🔑 پاسورڈ تبدیل کریں", "📢 نوٹیفیکیشنز"]
-
-selected = st.sidebar.radio("📌 مینو", menu)
-
+if st.button("🛠️ Supabase ٹیبلز بنائیں"):
+    selected = st.sidebar.radio("📌 مینو", menu)   
 # ==================== 6. ڈیٹا ====================
 surahs_urdu = ["الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
                "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبياء", "الحج",
@@ -2146,8 +2145,7 @@ def create_all_tables_in_supabase():
     except Exception as e:
         st.error(f"خرابی: {str(e)}")
 
-        if st.button("🛠️ Supabase ٹیبلز بنائیں"):
-            create_all_tables_in_supabase()
+
 # ==================== 10. لاگ آؤٹ ====================
 st.sidebar.divider()
 if st.sidebar.button("🚪 لاگ آؤٹ"):
