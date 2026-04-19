@@ -659,13 +659,10 @@ def create_all_tables_in_supabase():
 # ==================== 4. لاگ ان ====================
 def verify_login(username, password):
     try:
-        # Supabase سے صارف تلاش کریں
         response = supabase.table("teachers").select("*").eq("name", username).execute()
-        
         if response.data and len(response.data) > 0:
             user = response.data[0]
             stored_password = user['password']
-            
             # پاسورڈ چیک کریں (پہلے ہیش، پھر پلین)
             if stored_password == password or stored_password == hash_password(password):
                 return user
@@ -673,6 +670,38 @@ def verify_login(username, password):
     except Exception as e:
         st.error(f"لاگ ان میں خرابی: {str(e)}")
         return None
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    st.markdown("<div class='main-header'><h1>🕌 جامعہ ملیہ اسلامیہ فیصل آباد</h1><p>اسمارٹ تعلیمی و انتظامی پورٹل</p></div>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,1.5,1])
+    with col2:
+        with st.container():
+            st.markdown("<div class='report-card'><h3>🔐 لاگ ان</h3>", unsafe_allow_html=True)
+            u = st.text_input("صارف نام")
+            p = st.text_input("پاسورڈ", type="password")
+            
+            if st.button("داخل ہوں"):
+                user = verify_login(u, p)
+                if user:
+                    st.session_state.logged_in = True
+                    st.session_state.username = u
+                    # صارف کا درجہ چیک کریں (admin یا teacher)
+                    st.session_state.user_type = "admin" if u == "admin" else "teacher"
+                    log_audit(u, "Login", f"User type: {st.session_state.user_type}")
+                    st.rerun()
+                else:
+                    st.error("غلط صارف نام یا پاسورڈ")
+            
+            # عارضی بٹن (ضرورت نہ ہو تو حذف کر سکتے ہیں)
+            if st.button("🛠️ Supabase ٹیبلز بنائیں"):
+                create_all_tables_in_supabase()
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+    st.stop()
+
 # ==================== 5. مینو ====================
 if st.session_state.user_type == "admin":
     menu = ["📊 ایڈمن ڈیش بورڈ", "📊 یومیہ تعلیمی رپورٹ", "🎓 امتحانی نظام", "📜 ماہانہ رزلٹ کارڈ",
@@ -682,7 +711,8 @@ if st.session_state.user_type == "admin":
 else:
     menu = ["📝 روزانہ سبق اندراج", "🎓 امتحانی درخواست", "📩 رخصت کی درخواست",
             "🕒 میری حاضری", "📚 میرا ٹائم ٹیبل", "🔑 پاسورڈ تبدیل کریں", "📢 نوٹیفیکیشنز"]
-    selected = st.sidebar.radio("📌 مینو", menu)
+
+selected = st.sidebar.radio("📌 مینو", menu)
 # ==================== 6. ڈیٹا ====================
 surahs_urdu = ["الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
                "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبياء", "الحج",
