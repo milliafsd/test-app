@@ -658,44 +658,21 @@ def create_all_tables_in_supabase():
         st.error(f"❌ خرابی: {str(e)}")
 # ==================== 4. لاگ ان ====================
 def verify_login(username, password):
-    conn = get_db_connection()
-    res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (username, password)).fetchone()
-    if not res:
-        hashed = hash_password(password)
-        res = conn.execute("SELECT * FROM teachers WHERE name=? AND password=?", (username, hashed)).fetchone()
-    conn.close()
-    return res
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.markdown("<div class='main-header'><h1>🕌 جامعہ ملیہ اسلامیہ فیصل آباد</h1><p>اسمارٹ تعلیمی و انتظامی پورٹل</p></div>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,1.5,1])
-    with col2:
-        with st.container():
-            st.markdown("<div class='report-card'><h3>🔐 لاگ ان</h3>", unsafe_allow_html=True)
-            u = st.text_input("صارف نام")
-            p = st.text_input("پاسورڈ", type="password")
+    try:
+        # Supabase سے صارف تلاش کریں
+        response = supabase.table("teachers").select("*").eq("name", username).execute()
+        
+        if response.data and len(response.data) > 0:
+            user = response.data[0]
+            stored_password = user['password']
             
-            # لاگ ان بٹن
-            if st.button("داخل ہوں"):
-                res = verify_login(u, p)
-                if res:
-                    st.session_state.logged_in, st.session_state.username = True, u
-                    st.session_state.user_type = "admin" if u == "admin" else "teacher"
-                    log_audit(u, "Login", f"User type: {st.session_state.user_type}")
-                    st.rerun()
-                else:
-                    st.error("غلط معلومات")
-            
-            # Supabase ٹیبلز بنانے کا بٹن (عارضی)
-            if st.button("🛠️ Supabase ٹیبلز بنائیں"):
-                create_all_tables_in_supabase()
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
+            # پاسورڈ چیک کریں (پہلے ہیش، پھر پلین)
+            if stored_password == password or stored_password == hash_password(password):
+                return user
+        return None
+    except Exception as e:
+        st.error(f"لاگ ان میں خرابی: {str(e)}")
+        return None
 # ==================== 5. مینو ====================
 if st.session_state.user_type == "admin":
     menu = ["📊 ایڈمن ڈیش بورڈ", "📊 یومیہ تعلیمی رپورٹ", "🎓 امتحانی نظام", "📜 ماہانہ رزلٹ کارڈ",
@@ -757,13 +734,20 @@ def admin_reset_password(teacher_name, new_pass):
 # 8.1 ایڈمن ڈیش بورڈ
 if selected == "📊 ایڈمن ڈیش بورڈ" and st.session_state.user_type == "admin":
     st.markdown("<div class='main-header'><h1>📊 ایڈمن ڈیش بورڈ</h1></div>", unsafe_allow_html=True)
-    conn = get_db_connection()
-    total_students = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-    total_teachers = conn.execute("SELECT COUNT(*) FROM teachers WHERE name!='admin'").fetchone()[0]
-    col1, col2 = st.columns(2)
-    col1.metric("کل طلباء", total_students)
-    col2.metric("کل اساتذہ", total_teachers)
-    conn.close()
+    
+    # Supabase سے ڈیٹا حاصل کریں
+    try:
+        students_res = supabase.table("students").select("id", count="exact").execute()
+        total_students = students_res.count if students_res.count else 0
+        
+        teachers_res = supabase.table("teachers").select("id", count="exact").neq("name", "admin").execute()
+        total_teachers = teachers_res.count if teachers_res.count else 0
+        
+        col1, col2 = st.columns(2)
+        col1.metric("کل طلباء", total_students)
+        col2.metric("کل اساتذہ", total_teachers)
+    except Exception as e:
+        st.error(f"ڈیٹا لوڈ کرنے میں خرابی: {str(e)}")
 
 # 8.2 یومیہ تعلیمی رپورٹ (اب صفائی کالم کے ساتھ)
 elif selected == "📊 یومیہ تعلیمی رپورٹ" and st.session_state.user_type == "admin":
