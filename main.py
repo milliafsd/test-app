@@ -585,7 +585,77 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+# ==================== Supabase ٹیبلز خودکار بنانے کا فنکشن ====================
+def create_all_tables_in_supabase():
+    try:
+        # teachers
+        supabase.table("teachers").insert({"name": "test", "password": "test"}).execute()
+        supabase.table("teachers").delete().eq("name", "test").execute()
+        st.write("✅ teachers")
 
+        # students
+        supabase.table("students").insert({"name": "test"}).execute()
+        supabase.table("students").delete().eq("name", "test").execute()
+        st.write("✅ students")
+
+        # hifz_records
+        supabase.table("hifz_records").insert({"t_name": "test"}).execute()
+        supabase.table("hifz_records").delete().eq("t_name", "test").execute()
+        st.write("✅ hifz_records")
+
+        # qaida_records
+        supabase.table("qaida_records").insert({"t_name": "test"}).execute()
+        supabase.table("qaida_records").delete().eq("t_name", "test").execute()
+        st.write("✅ qaida_records")
+
+        # general_education
+        supabase.table("general_education").insert({"t_name": "test"}).execute()
+        supabase.table("general_education").delete().eq("t_name", "test").execute()
+        st.write("✅ general_education")
+
+        # t_attendance
+        supabase.table("t_attendance").insert({"t_name": "test"}).execute()
+        supabase.table("t_attendance").delete().eq("t_name", "test").execute()
+        st.write("✅ t_attendance")
+
+        # leave_requests
+        supabase.table("leave_requests").insert({"t_name": "test"}).execute()
+        supabase.table("leave_requests").delete().eq("t_name", "test").execute()
+        st.write("✅ leave_requests")
+
+        # exams
+        supabase.table("exams").insert({"dept": "test"}).execute()
+        supabase.table("exams").delete().eq("dept", "test").execute()
+        st.write("✅ exams")
+
+        # passed_paras
+        supabase.table("passed_paras").insert({"grade": "test"}).execute()
+        supabase.table("passed_paras").delete().eq("grade", "test").execute()
+        st.write("✅ passed_paras")
+
+        # timetable
+        supabase.table("timetable").insert({"t_name": "test"}).execute()
+        supabase.table("timetable").delete().eq("t_name", "test").execute()
+        st.write("✅ timetable")
+
+        # notifications
+        supabase.table("notifications").insert({"title": "test"}).execute()
+        supabase.table("notifications").delete().eq("title", "test").execute()
+        st.write("✅ notifications")
+
+        # audit_log
+        supabase.table("audit_log").insert({"user": "test"}).execute()
+        supabase.table("audit_log").delete().eq("user", "test").execute()
+        st.write("✅ audit_log")
+
+        # staff_monitoring
+        supabase.table("staff_monitoring").insert({"staff_name": "test"}).execute()
+        supabase.table("staff_monitoring").delete().eq("staff_name", "test").execute()
+        st.write("✅ staff_monitoring")
+
+        st.success("🎉 تمام 13 ٹیبلز کامیابی سے بن گئیں!")
+    except Exception as e:
+        st.error(f"❌ خرابی: {str(e)}")
 # ==================== 4. لاگ ان ====================
 def verify_login(username, password):
     conn = get_db_connection()
@@ -635,6 +705,7 @@ if st.session_state.user_type == "admin":
 else:
     menu = ["📝 روزانہ سبق اندراج", "🎓 امتحانی درخواست", "📩 رخصت کی درخواست",
             "🕒 میری حاضری", "📚 میرا ٹائم ٹیبل", "🔑 پاسورڈ تبدیل کریں", "📢 نوٹیفیکیشنز"]
+    selected = st.sidebar.radio("📌 مینو", menu)
 # ==================== 6. ڈیٹا ====================
 surahs_urdu = ["الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال", "التوبة", "يونس",
                "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف", "مريم", "طه", "الأنبياء", "الحج",
@@ -2081,78 +2152,6 @@ elif selected == "📚 میرا ٹائم ٹیبل" and st.session_state.user_typ
         st.download_button("📥 HTML ڈاؤن لوڈ کریں", html_timetable, f"Timetable_{st.session_state.username}.html", "text/html")
         if st.button("🖨️ پرنٹ کریں"):
             st.components.v1.html(f"<script>var w=window.open();w.document.write(`{html_timetable}`);w.print();</script>", height=0)
-# ==================== Supabase ٹیبلز خودکار بنانے کا فنکشن ====================
-def create_all_tables_in_supabase():
-    try:
-        # teachers
-        supabase.table("teachers").insert({"name": "test", "password": "test"}).execute()
-        supabase.table("teachers").delete().eq("name", "test").execute()
-        st.write("✅ teachers")
-
-        # students
-        supabase.table("students").insert({"name": "test"}).execute()
-        supabase.table("students").delete().eq("name", "test").execute()
-        st.write("✅ students")
-
-        # hifz_records
-        supabase.table("hifz_records").insert({"t_name": "test"}).execute()
-        supabase.table("hifz_records").delete().eq("t_name", "test").execute()
-        st.write("✅ hifz_records")
-
-        # qaida_records
-        supabase.table("qaida_records").insert({"t_name": "test"}).execute()
-        supabase.table("qaida_records").delete().eq("t_name", "test").execute()
-        st.write("✅ qaida_records")
-
-        # general_education
-        supabase.table("general_education").insert({"t_name": "test"}).execute()
-        supabase.table("general_education").delete().eq("t_name", "test").execute()
-        st.write("✅ general_education")
-
-        # t_attendance
-        supabase.table("t_attendance").insert({"t_name": "test"}).execute()
-        supabase.table("t_attendance").delete().eq("t_name", "test").execute()
-        st.write("✅ t_attendance")
-
-        # leave_requests
-        supabase.table("leave_requests").insert({"t_name": "test"}).execute()
-        supabase.table("leave_requests").delete().eq("t_name", "test").execute()
-        st.write("✅ leave_requests")
-
-        # exams
-        supabase.table("exams").insert({"dept": "test"}).execute()
-        supabase.table("exams").delete().eq("dept", "test").execute()
-        st.write("✅ exams")
-
-        # passed_paras
-        supabase.table("passed_paras").insert({"grade": "test"}).execute()
-        supabase.table("passed_paras").delete().eq("grade", "test").execute()
-        st.write("✅ passed_paras")
-
-        # timetable
-        supabase.table("timetable").insert({"t_name": "test"}).execute()
-        supabase.table("timetable").delete().eq("t_name", "test").execute()
-        st.write("✅ timetable")
-
-        # notifications
-        supabase.table("notifications").insert({"title": "test"}).execute()
-        supabase.table("notifications").delete().eq("title", "test").execute()
-        st.write("✅ notifications")
-
-        # audit_log
-        supabase.table("audit_log").insert({"user": "test"}).execute()
-        supabase.table("audit_log").delete().eq("user", "test").execute()
-        st.write("✅ audit_log")
-
-        # staff_monitoring
-        supabase.table("staff_monitoring").insert({"staff_name": "test"}).execute()
-        supabase.table("staff_monitoring").delete().eq("staff_name", "test").execute()
-        st.write("✅ staff_monitoring")
-
-        st.success("🎉 تمام 13 ٹیبلز کامیابی سے بن گئیں!")
-    except Exception as e:
-        st.error(f"❌ خرابی: {str(e)}")
-
 # ==================== 10. لاگ آؤٹ ====================
 st.sidebar.divider()
 if st.sidebar.button("🚪 لاگ آؤٹ"):
